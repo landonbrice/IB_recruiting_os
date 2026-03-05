@@ -1,0 +1,15 @@
+# dependencies
+ib-recruiting-os/node_modules/
+
+# Next.js
+ib-recruiting-os/.next/
+ib-recruiting-os/out/
+
+# env files
+.env.local
+ib-recruiting-os/.env.local
+ib-recruiting-os/.env*.local
+
+# misc
+.DS_Store
+*.tsbuildinfo

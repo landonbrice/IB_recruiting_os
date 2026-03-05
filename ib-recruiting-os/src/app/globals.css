@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --panel-bg: #1c1917;
+  --panel-border: #292524;
+  --accent: #d97706;
+  --accent-muted: #92400e;
+  --text-primary: #fafaf9;
+  --text-secondary: #a8a29e;
+  --text-muted: #57534e;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Scrollable areas */
+.scrollable {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-border) transparent;
+}
+
+.scrollable::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollable::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollable::-webkit-scrollbar-thumb {
+  background-color: var(--panel-border);
+  border-radius: 2px;
+}
+
+/* Sidebar scrollable */
+.sidebar-scrollable {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #292524 transparent;
+}
+
+.sidebar-scrollable::-webkit-scrollbar {
+  width: 3px;
+}
+
+.sidebar-scrollable::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scrollable::-webkit-scrollbar-thumb {
+  background-color: #292524;
+  border-radius: 2px;
+}
+
+/* Resume document styling */
+.resume-document {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 11pt;
+  line-height: 1.4;
+  color: #1a1a1a;
+}
+
+.resume-document h1 {
+  font-size: 16pt;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 2px;
+}
+
+.resume-document h2 {
+  font-size: 11pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #1a1a1a;
+  margin-top: 10px;
+  margin-bottom: 4px;
+  padding-bottom: 1px;
+}
+
+.resume-document p,
+.resume-document li {
+  margin-bottom: 2px;
+}
+
+/* Mammoth HTML resume styling (DOCX output) */
+.resume-html {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 11pt;
+  line-height: 1.4;
+  color: #1a1a1a;
+}
+
+.resume-html p {
+  margin: 0 0 2px 0;
+}
+
+.resume-html h1 {
+  font-size: 14pt;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 4px 0;
+}
+
+.resume-html h2 {
+  font-size: 11pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #1a1a1a;
+  margin: 10px 0 4px 0;
+  padding-bottom: 1px;
+}
+
+.resume-html strong {
+  font-weight: 700;
+}
+
+.resume-html ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  list-style-type: disc;
+}
+
+.resume-html li {
+  margin-bottom: 2px;
+  font-size: 10pt;
+  line-height: 1.35;
+}
+
+.resume-html table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.resume-html td {
+  padding: 1px 4px 1px 0;
+  vertical-align: top;
+  font-size: 10pt;
+}
+
+/* Chat message styling */
+.chat-message-user {
+  @apply bg-stone-800 rounded-2xl rounded-br-sm px-4 py-3 text-sm text-stone-100;
+}
+
+.chat-message-assistant {
+  @apply text-sm text-stone-200 leading-relaxed;
+}
+
+/* Typing indicator */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.typing-dot {
+  animation: blink 1.2s infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
