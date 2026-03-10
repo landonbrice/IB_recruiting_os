@@ -56,11 +56,14 @@ export default function UploadOverlay({ onUpload }: Props) {
       <div className="w-full max-w-lg px-8">
         {/* Header */}
         <div className="mb-10 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-stone-100">
-            IB Recruiting OS
-          </h1>
-          <p className="mt-2 text-sm text-stone-400">
-            Your honest guide to breaking into investment banking.
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+            <h1 className="text-2xl font-semibold tracking-tight text-stone-100">
+              IB Resume Coach
+            </h1>
+          </div>
+          <p className="mt-1 text-sm text-stone-400">
+            Brutally honest. Built for banking.
           </p>
         </div>
 

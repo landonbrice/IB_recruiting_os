@@ -1,8 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { NextRequest } from "next/server";
 import type { CandidateProfile } from "@/lib/types";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = new OpenAI({
+  apiKey: process.env.DEEPSEEK_API_KEY,
+  baseURL: "https://api.deepseek.com",
+});
 
 interface SuggestRequest {
   bullet: string;
@@ -54,23 +57,24 @@ export async function POST(req: NextRequest) {
     maxTokens = 1024;
   }
 
-  const stream = await client.messages.stream({
-    model: "claude-sonnet-4-6",
+  const stream = await client.chat.completions.create({
+    model: "deepseek-chat",
     max_tokens: maxTokens,
-    system,
-    messages: [{ role: "user", content: userMessage }],
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: userMessage },
+    ],
+    stream: true,
   });
 
   const encoder = new TextEncoder();
 
   const readable = new ReadableStream({
     async start(controller) {
-      for await (const event of stream) {
-        if (
-          event.type === "content_block_delta" &&
-          event.delta.type === "text_delta"
-        ) {
-          const data = JSON.stringify({ delta: { text: event.delta.text } });
+      for await (const chunk of stream) {
+        const text = chunk.choices[0]?.delta?.content ?? "";
+        if (text) {
+          const data = JSON.stringify({ delta: { text } });
           controller.enqueue(encoder.encode(`data: ${data}\n\n`));
         }
       }

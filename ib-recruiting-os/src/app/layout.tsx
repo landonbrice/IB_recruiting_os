@@ -14,8 +14,15 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "IB Recruiting OS",
-  description: "An honest guide to breaking into investment banking.",
+  title: "IB Resume Coach — Built for Banking",
+  description:
+    "An AI-powered IB recruiting coach that scores your resume, rewrites bullets live, develops your story, and tells you honestly where you stand — including whether networking matters more than another rewrite.",
+  openGraph: {
+    title: "IB Resume Coach",
+    description:
+      "The IB resume coach that's brutally honest. Drop your resume, get scored, get coached.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -24,9 +31,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased h-full bg-stone-950 text-stone-100`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-stone-950 text-stone-100`}
       >
         {children}
       </body>

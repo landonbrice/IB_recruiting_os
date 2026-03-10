@@ -1,5 +1,7 @@
 # IB Recruiting OS — Current State
 
+> **Status note (2026-03-10):** This file is historical context from early build stage. Current implementation state is tracked in `../LOUIS_BUILD_LOG.md` and `CHANGELOG-2026-03-10-ux-pass.md`.
+
 _Last updated: 2026-03-04 19:06 CST_
 
 ## Project goal (assimilated)

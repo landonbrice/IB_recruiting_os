@@ -12,11 +12,8 @@
   --text-muted: #57534e;
 }
 
-html,
-body {
-  height: 100%;
-  overflow: hidden;
-}
+/* Base height/overflow is NOT set globally — the app shell layout
+   applies fixed/overflow-hidden; the landing page needs to scroll. */
 
 /* Scrollable areas */
 .scrollable {
