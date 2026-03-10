@@ -253,6 +253,7 @@ function ResumePanelB({
   onApplyBullet: (idx: number, company: string, text: string, meta?: { confidence?: "High" | "Medium" | "Low"; risk?: "Low" | "Medium" | "High" }) => void;
 }) {
   const [selected, setSelected] = useState<EnrichedLine | null>(null);
+  const [activeRewriteId, setActiveRewriteId] = useState<string | null>(null);
 
   if (!resumeText) {
     return (
@@ -262,6 +263,7 @@ function ResumePanelB({
     );
   }
   const lines = enrichLines(resumeText);
+  const activeRewrite = rewriteHistory.find((r) => r.id === activeRewriteId) ?? rewriteHistory[0] ?? null;
 
   return (
     <div className="flex h-full flex-col bg-slate-50">
@@ -276,15 +278,39 @@ function ResumePanelB({
       <div className="flex-1 overflow-y-auto px-8 py-8">
         <div className="mx-auto max-w-[600px] space-y-3">
           {rewriteHistory.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {rewriteHistory.slice(0, 3).map((r) => (
-                <div key={r.id} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] text-slate-600 shadow-sm">
-                  <span className="font-medium text-slate-700">{r.company}</span>
-                  {r.confidence && <span className="ml-1 text-emerald-600">• {r.confidence}</span>}
-                  {r.risk && <span className="ml-1 text-amber-600">risk {r.risk.toLowerCase()}</span>}
+            <>
+              <div className="flex flex-wrap gap-2">
+                {rewriteHistory.slice(0, 4).map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => setActiveRewriteId(r.id)}
+                    className={`rounded-full border px-3 py-1 text-[11px] shadow-sm transition ${
+                      activeRewriteId === r.id
+                        ? "border-amber-300 bg-amber-50 text-amber-800"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-amber-200"
+                    }`}
+                  >
+                    <span className="font-medium">{r.company}</span>
+                    {r.confidence && <span className="ml-1 text-emerald-600">• {r.confidence}</span>}
+                    {r.risk && <span className="ml-1 text-amber-600">risk {r.risk.toLowerCase()}</span>}
+                  </button>
+                ))}
+              </div>
+
+              {activeRewrite && (
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Last applied rewrite</p>
+                  <div className="space-y-2 text-[12px]">
+                    <div className="rounded-lg bg-red-50 p-2 text-red-800">
+                      <span className="mr-2 font-semibold">Before</span>{activeRewrite.beforeText || "(No previous bullet captured)"}
+                    </div>
+                    <div className="rounded-lg bg-emerald-50 p-2 text-emerald-800">
+                      <span className="mr-2 font-semibold">After</span>{activeRewrite.afterText}
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
 
           <div className="rounded-xl border border-slate-200 bg-white px-8 py-8 shadow-sm">

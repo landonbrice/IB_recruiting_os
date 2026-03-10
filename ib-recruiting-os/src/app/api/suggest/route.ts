@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { NextRequest } from "next/server";
 import type { CandidateProfile } from "@/lib/types";
+import { getExemplarContext } from "@/lib/ibExemplars";
 
 const client = new OpenAI({
   apiKey: process.env.DEEPSEEK_API_KEY,
@@ -58,7 +59,8 @@ export async function POST(req: NextRequest) {
     const answerContext = question && answer
       ? `\n\nClarifying Q: ${question}\nCandidate's answer: ${answer}`
       : "";
-    userMessage = `${profileSummary}\n\nRole: ${roleTitle} at ${company} (${section})\nCurrent bullet: "${bullet}"${answerContext}\n\nProvide 3 rewritten variants:`;
+    const exemplarContext = getExemplarContext(roleTitle, section, 3);
+    userMessage = `${profileSummary}\n\nRole: ${roleTitle} at ${company} (${section})\nCurrent bullet: "${bullet}"${answerContext}\n\nReference style examples (for structure/tone only, never copy):\n${exemplarContext}\n\nProvide 3 rewritten variants:`;
     maxTokens = 1024;
   }
 
