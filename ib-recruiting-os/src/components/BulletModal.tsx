@@ -15,7 +15,12 @@ interface BulletModalProps {
   bullet: SelectedBullet;
   candidateProfile: CandidateProfile;
   resumeText: string;
-  onApply: (bulletIndex: number, company: string, newText: string) => void;
+  onApply: (
+    bulletIndex: number,
+    company: string,
+    newText: string,
+    meta?: { confidence?: "High" | "Medium" | "Low"; risk?: "Low" | "Medium" | "High" }
+  ) => void;
   onClose: () => void;
 }
 
@@ -52,11 +57,43 @@ async function streamSuggest(
   }
 }
 
-function parseBullets(raw: string): string[] {
-  return raw
-    .split("\n")
-    .filter((l) => l.trim().startsWith("BULLET: "))
-    .map((l) => l.replace(/^BULLET:\s*/, "").trim());
+interface Variant {
+  text: string;
+  confidence?: "High" | "Medium" | "Low";
+  risk?: "Low" | "Medium" | "High";
+}
+
+function parseBullets(raw: string): Variant[] {
+  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  const out: Variant[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith("BULLET: ")) continue;
+    const text = lines[i].replace(/^BULLET:\s*/, "").trim();
+    let confidence: Variant["confidence"];
+    let risk: Variant["risk"];
+
+    const cLine = lines[i + 1] ?? "";
+    const rLine = lines[i + 2] ?? "";
+
+    if (/^CONFIDENCE:/i.test(cLine)) {
+      const v = cLine.replace(/^CONFIDENCE:\s*/i, "").trim().toLowerCase();
+      confidence = v === "high" ? "High" : v === "medium" ? "Medium" : v === "low" ? "Low" : undefined;
+    }
+    if (/^RISK:/i.test(rLine)) {
+      const v = rLine.replace(/^RISK:\s*/i, "").trim().toLowerCase();
+      risk = v === "high" ? "High" : v === "medium" ? "Medium" : v === "low" ? "Low" : undefined;
+    }
+
+    out.push({ text, confidence, risk });
+  }
+
+  if (out.length > 0) return out;
+
+  // Backward compatibility fallback
+  return lines
+    .filter((l) => l.startsWith("BULLET: "))
+    .map((l) => ({ text: l.replace(/^BULLET:\s*/, "").trim() }));
 }
 
 export default function BulletModal({
@@ -70,7 +107,7 @@ export default function BulletModal({
   const [question, setQuestion] = useState("");
   const [userAnswer, setUserAnswer] = useState("");
   const [streamText, setStreamText] = useState("");
-  const [variants, setVariants] = useState<string[]>([]);
+  const [variants, setVariants] = useState<Variant[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -130,8 +167,11 @@ export default function BulletModal({
     setIsStreaming(false);
   }
 
-  function handleApply(variantText: string) {
-    onApply(bullet.bulletIndex, bullet.company, variantText);
+  function handleApply(v: Variant) {
+    onApply(bullet.bulletIndex, bullet.company, v.text, {
+      confidence: v.confidence,
+      risk: v.risk,
+    });
     onClose();
   }
 
@@ -228,7 +268,27 @@ export default function BulletModal({
                     key={idx}
                     className="bg-stone-800 rounded-lg px-4 py-3 flex items-start justify-between gap-3"
                   >
-                    <p className="text-sm text-stone-200 leading-snug flex-1">{v}</p>
+                    <div className="flex-1">
+                      <p className="text-sm text-stone-200 leading-snug">{v.text}</p>
+                      <div className="mt-2 flex items-center gap-2 text-[10px]">
+                        {v.confidence && (
+                          <span className={`rounded-full px-2 py-0.5 ${
+                            v.confidence === "High" ? "bg-emerald-900/40 text-emerald-300" :
+                            v.confidence === "Medium" ? "bg-amber-900/40 text-amber-300" : "bg-red-900/40 text-red-300"
+                          }`}>
+                            Confidence: {v.confidence}
+                          </span>
+                        )}
+                        {v.risk && (
+                          <span className={`rounded-full px-2 py-0.5 ${
+                            v.risk === "Low" ? "bg-emerald-900/30 text-emerald-200" :
+                            v.risk === "Medium" ? "bg-amber-900/30 text-amber-200" : "bg-red-900/30 text-red-200"
+                          }`}>
+                            Risk: {v.risk}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                     <button
                       onClick={() => handleApply(v)}
                       className="flex-shrink-0 text-xs text-amber-400 hover:text-amber-300 font-medium transition whitespace-nowrap"

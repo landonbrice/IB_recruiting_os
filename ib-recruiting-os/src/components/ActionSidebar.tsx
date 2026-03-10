@@ -13,6 +13,7 @@ interface ActionSidebarProps {
   mode: string;
   messages: Message[];
   onAction: (action: string) => void;
+  scoreHistory?: { total: number; createdAt: number }[];
   onNewSession?: () => void;
   onExport?: () => void;
 }
@@ -90,6 +91,7 @@ export default function ActionSidebar({
   mode,
   messages,
   onAction,
+  scoreHistory = [],
   onNewSession,
   onExport,
 }: ActionSidebarProps) {
@@ -175,6 +177,27 @@ export default function ActionSidebar({
           </div>
         )}
       </div>
+
+      {/* ── Score Trend ─────────────────────────────────────────────────── */}
+      {scoreHistory.length > 1 && (
+        <div className="border-b border-stone-800 px-4 py-3">
+          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+            Score Trend
+          </h3>
+          <div className="flex h-10 items-end gap-1">
+            {scoreHistory.slice(-8).map((p, i, arr) => {
+              const h = Math.max(8, Math.round((p.total / 100) * 36));
+              const up = i > 0 && p.total > arr[i - 1].total;
+              return (
+                <div key={`${p.createdAt}-${i}`} className={`flex-1 rounded-t ${up ? "bg-emerald-500" : "bg-stone-600"}`} style={{ height: h }} />
+              );
+            })}
+          </div>
+          <p className="mt-1 text-[10px] text-stone-500">
+            {scoreHistory[0]?.total} → {scoreHistory[scoreHistory.length - 1]?.total}
+          </p>
+        </div>
+      )}
 
       {/* ── Guided Outcomes ─────────────────────────────────────────────── */}
       {topIssues.length > 0 && (

@@ -29,8 +29,13 @@ Rules:
 - Include specific numbers wherever possible
 - Keep each bullet to one tight sentence, max 2 lines
 - Return EXACTLY 3 variants
-- Each variant must start on its own line beginning with exactly "BULLET: " (capital BULLET, colon, space)
-- Do not number them, add explanations, or include any other text`;
+- For EACH variant output this exact 3-line block format:
+  BULLET: <rewritten bullet>
+  CONFIDENCE: <High|Medium|Low>
+  RISK: <Low|Medium|High>
+- Confidence should reflect how well the bullet is specific and quantifiable.
+- Risk should reflect likelihood the claim sounds inflated/unsupported.
+- Do not number variants or add any other text outside these blocks.`;
 
 export async function POST(req: NextRequest) {
   const body: SuggestRequest = await req.json();

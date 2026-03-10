@@ -34,6 +34,7 @@ export default function ThemeA() {
           mode={session.mode}
           messages={session.messages}
           onAction={session.handleAction}
+          scoreHistory={session.scoreHistory}
           onNewSession={session.handleNewSession}
           onExport={() => setShowExport(true)}
         />

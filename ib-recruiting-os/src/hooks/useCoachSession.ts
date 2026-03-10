@@ -27,6 +27,22 @@ import type {
 
 const LS_KEY = "ib_coach_session_v1";
 
+interface RewriteEvent {
+  id: string;
+  company: string;
+  bulletIndex: number;
+  beforeText: string;
+  afterText: string;
+  confidence?: "High" | "Medium" | "Low";
+  risk?: "Low" | "Medium" | "High";
+  createdAt: number;
+}
+
+interface ScoreHistoryPoint {
+  total: number;
+  createdAt: number;
+}
+
 interface PersistedSession {
   messages: Message[];
   candidateProfile: CandidateProfile;
@@ -37,6 +53,8 @@ interface PersistedSession {
   updateCount: number;
   fileName: string | null;
   resumeHtml: string | null;
+  rewriteHistory?: RewriteEvent[];
+  scoreHistory?: ScoreHistoryPoint[];
 }
 
 function loadSession(): PersistedSession | null {
@@ -51,6 +69,35 @@ function saveSession(s: PersistedSession) {
 }
 
 // ── Resume update applier ─────────────────────────────────────────────────────
+
+function findBulletText(text: string, company: string, bulletIndex: number): string {
+  const lines = text.split("\n");
+  let companyIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes(company)) { companyIdx = i; break; }
+  }
+  if (companyIdx === -1) return "";
+
+  let bulletCount = 0;
+  let inBulletSection = false;
+  for (let i = companyIdx + 1; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (!trimmed) continue;
+    const isBullet = /^[▪•\-·]/.test(trimmed);
+    const isNewSection =
+      (trimmed === trimmed.toUpperCase() && trimmed.length < 40) ||
+      /^(Education|Experience|Skills|Activities|Leadership|Projects|Summary|Objective|Work Experience|Extracurriculars)/i.test(trimmed);
+    if (isNewSection && inBulletSection) break;
+    if (isBullet) {
+      inBulletSection = true;
+      if (bulletCount === bulletIndex) {
+        return trimmed.replace(/^[▪•\-·]\s*/, "").trim();
+      }
+      bulletCount++;
+    }
+  }
+  return "";
+}
 
 function applyUpdate(text: string, update: ResumeUpdate): string {
   if (!update.company || update.bulletIndex === undefined) return text;
@@ -98,6 +145,8 @@ export function useCoachSession() {
   const [mode, setMode] = useState<ChatMode>("diagnostic");
   const [candidateProfile, setCandidateProfile] = useState<CandidateProfile>({});
   const [resumeScore, setResumeScore] = useState<ResumeScore | null>(null);
+  const [scoreHistory, setScoreHistory] = useState<ScoreHistoryPoint[]>([]);
+  const [rewriteHistory, setRewriteHistory] = useState<RewriteEvent[]>([]);
   const [showIntakeForm, setShowIntakeForm] = useState(false);
 
   const autoScoreQueued = useRef(false);
@@ -141,6 +190,8 @@ export function useCoachSession() {
       setResumeScore(saved.resumeScore);
       setMode(saved.mode);
       setUpdateCount(saved.updateCount);
+      setRewriteHistory(saved.rewriteHistory ?? []);
+      setScoreHistory(saved.scoreHistory ?? (saved.resumeScore ? [{ total: saved.resumeScore.total, createdAt: Date.now() }] : []));
       logEvent("session_restored", { messageCount: saved.messages.length });
     }
     isRestoredRef.current = true;
@@ -152,10 +203,11 @@ export function useCoachSession() {
     const t = setTimeout(() => saveSession({
       messages, candidateProfile, resumeText, currentResumeText,
       resumeScore, mode, updateCount, fileName, resumeHtml,
+      rewriteHistory, scoreHistory,
     }), 500);
     return () => clearTimeout(t);
   }, [messages, candidateProfile, resumeText, currentResumeText,
-      resumeScore, mode, updateCount, fileName, resumeHtml]);
+      resumeScore, mode, updateCount, fileName, resumeHtml, rewriteHistory, scoreHistory]);
 
   // ── Upload ──────────────────────────────────────────────────────────────
   const handleUpload = useCallback((text: string, name: string, file: File, html?: string) => {
@@ -174,6 +226,7 @@ export function useCoachSession() {
     setResumeText(null); setCurrentResumeText(null); setFileName(null);
     setResumeFile(null); setResumeHtml(null); setMessages([]);
     setCandidateProfile({}); setResumeScore(null);
+    setScoreHistory([]); setRewriteHistory([]);
     setMode("diagnostic"); setUpdateCount(0); setShowIntakeForm(false);
     logEvent("session_reset", {});
   }, []);
@@ -241,6 +294,10 @@ export function useCoachSession() {
           logEvent("score_updated", { total: scoreUpdate!.total, prev: s?.total ?? null });
           return scoreUpdate;
         });
+        setScoreHistory(prev => {
+          if (prev[prev.length - 1]?.total === scoreUpdate!.total) return prev;
+          return [...prev, { total: scoreUpdate!.total, createdAt: Date.now() }].slice(-20);
+        });
       }
 
       const updates = parseResumeUpdates(assistantContent);
@@ -273,9 +330,29 @@ export function useCoachSession() {
   }, [resumeText, mode, candidateProfile]);
 
   // ── Apply bullet ────────────────────────────────────────────────────────
-  const handleApplyBullet = useCallback((bulletIndex: number, company: string, newText: string) => {
-    setCurrentResumeText(prev => applyUpdate(prev ?? "", { section: "", company, bulletIndex, newText }));
-    setUpdateCount(n => { logEvent("bullet_applied_manual", { company, bulletIndex }); return n + 1; });
+  const handleApplyBullet = useCallback((
+    bulletIndex: number,
+    company: string,
+    newText: string,
+    meta?: { confidence?: "High" | "Medium" | "Low"; risk?: "Low" | "Medium" | "High" }
+  ) => {
+    setCurrentResumeText(prev => {
+      const current = prev ?? "";
+      const before = findBulletText(current, company, bulletIndex);
+      const updated = applyUpdate(current, { section: "", company, bulletIndex, newText });
+      setRewriteHistory(hist => [{
+        id: `${Date.now()}-${company}-${bulletIndex}`,
+        company,
+        bulletIndex,
+        beforeText: before,
+        afterText: newText,
+        confidence: meta?.confidence,
+        risk: meta?.risk,
+        createdAt: Date.now(),
+      }, ...hist].slice(0, 12));
+      return updated;
+    });
+    setUpdateCount(n => { logEvent("bullet_applied_manual", { company, bulletIndex, confidence: meta?.confidence, risk: meta?.risk }); return n + 1; });
   }, []);
 
   // ── Intake submit ───────────────────────────────────────────────────────
@@ -317,7 +394,7 @@ export function useCoachSession() {
     // State
     resumeText, currentResumeText, resumeFile, resumeHtml, fileName,
     updateCount, messages: visibleMessages, isStreaming, mode,
-    candidateProfile, resumeScore, showIntakeForm, showResumePanel,
+    candidateProfile, resumeScore, scoreHistory, rewriteHistory, showIntakeForm, showResumePanel,
     // Actions
     handleUpload, handleNewSession, handleIntakeSubmit,
     handleAction, handleSend, handleApplyBullet, handleRequestScore,

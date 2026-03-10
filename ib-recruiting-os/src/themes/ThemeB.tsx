@@ -34,8 +34,9 @@ function scoreColor(n: number) {
   return "#ef4444";
 }
 
-function ScorePanelB({ score, onAction, isStreaming }: {
+function ScorePanelB({ score, scoreHistory, onAction, isStreaming }: {
   score: ResumeScore | null;
+  scoreHistory: { total: number; createdAt: number }[];
   onAction: (a: string) => void;
   isStreaming: boolean;
 }) {
@@ -97,6 +98,31 @@ function ScorePanelB({ score, onAction, isStreaming }: {
           </div>
         )}
       </div>
+
+      {/* Score trend */}
+      {scoreHistory.length > 1 && (
+        <div className="border-b border-slate-100 px-5 py-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Score Trend</p>
+          <div className="flex items-end gap-1 h-12">
+            {scoreHistory.slice(-8).map((p, i, arr) => {
+              const h = Math.max(10, Math.round((p.total / 100) * 44));
+              const up = i > 0 && p.total > arr[i - 1].total;
+              return (
+                <div key={`${p.createdAt}-${i}`} className="flex-1">
+                  <div
+                    title={`Score: ${p.total}`}
+                    className={`w-full rounded-t ${up ? "bg-emerald-400" : "bg-slate-300"}`}
+                    style={{ height: `${h}px` }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[11px] text-slate-500">
+            Started {scoreHistory[0]?.total} → Now {scoreHistory[scoreHistory.length - 1]?.total}
+          </p>
+        </div>
+      )}
 
       {/* Issues */}
       {score && score.hurting.length > 0 && (
@@ -218,12 +244,13 @@ function enrichLines(text: string): EnrichedLine[] {
 }
 
 function ResumePanelB({
-  resumeText, updateCount, candidateProfile, onApplyBullet,
+  resumeText, updateCount, candidateProfile, rewriteHistory, onApplyBullet,
 }: {
   resumeText: string | null;
   updateCount: number;
   candidateProfile: CandidateProfile;
-  onApplyBullet: (idx: number, company: string, text: string) => void;
+  rewriteHistory: { id: string; company: string; beforeText: string; afterText: string; confidence?: "High" | "Medium" | "Low"; risk?: "Low" | "Medium" | "High" }[];
+  onApplyBullet: (idx: number, company: string, text: string, meta?: { confidence?: "High" | "Medium" | "Low"; risk?: "Low" | "Medium" | "High" }) => void;
 }) {
   const [selected, setSelected] = useState<EnrichedLine | null>(null);
 
@@ -247,27 +274,41 @@ function ResumePanelB({
         )}
       </div>
       <div className="flex-1 overflow-y-auto px-8 py-8">
-        <div className="mx-auto max-w-[600px] rounded-xl border border-slate-200 bg-white px-8 py-8 shadow-sm">
-          {lines.map(el => {
-            const key = el.rawIndex;
-            const t = el.text.trim();
-            if (el.type === "blank") return <div key={key} className="h-2" />;
-            if (el.type === "section-header") return (
-              <h2 key={key} className="mt-4 mb-1 border-b border-slate-800 pb-0.5 text-[10pt] font-bold uppercase tracking-wide text-slate-900">{t}</h2>
-            );
-            if (el.type === "bullet") {
-              const clickable = !!el.company;
-              return (
-                <p key={key}
-                  onClick={clickable ? () => setSelected(el) : undefined}
-                  title={clickable ? "Click to rewrite" : undefined}
-                  className={`mb-0.5 pl-4 text-[10pt] leading-snug text-slate-800 ${clickable ? "cursor-pointer rounded hover:bg-amber-50 transition-colors" : ""}`}>
-                  {t}
-                </p>
+        <div className="mx-auto max-w-[600px] space-y-3">
+          {rewriteHistory.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {rewriteHistory.slice(0, 3).map((r) => (
+                <div key={r.id} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] text-slate-600 shadow-sm">
+                  <span className="font-medium text-slate-700">{r.company}</span>
+                  {r.confidence && <span className="ml-1 text-emerald-600">• {r.confidence}</span>}
+                  {r.risk && <span className="ml-1 text-amber-600">risk {r.risk.toLowerCase()}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="rounded-xl border border-slate-200 bg-white px-8 py-8 shadow-sm">
+            {lines.map(el => {
+              const key = el.rawIndex;
+              const t = el.text.trim();
+              if (el.type === "blank") return <div key={key} className="h-2" />;
+              if (el.type === "section-header") return (
+                <h2 key={key} className="mt-4 mb-1 border-b border-slate-800 pb-0.5 text-[10pt] font-bold uppercase tracking-wide text-slate-900">{t}</h2>
               );
-            }
-            return <p key={key} className={`mb-0.5 text-[10pt] leading-snug text-slate-800 ${key === 0 ? "text-center text-[14pt] font-bold" : ""}`}>{t}</p>;
-          })}
+              if (el.type === "bullet") {
+                const clickable = !!el.company;
+                return (
+                  <p key={key}
+                    onClick={clickable ? () => setSelected(el) : undefined}
+                    title={clickable ? "Click to rewrite" : undefined}
+                    className={`mb-0.5 pl-4 text-[10pt] leading-snug text-slate-800 ${clickable ? "cursor-pointer rounded hover:bg-amber-50 transition-colors" : ""}`}>
+                    {t}
+                  </p>
+                );
+              }
+              return <p key={key} className={`mb-0.5 text-[10pt] leading-snug text-slate-800 ${key === 0 ? "text-center text-[14pt] font-bold" : ""}`}>{t}</p>;
+            })}
+          </div>
         </div>
       </div>
       {selected && (
@@ -275,7 +316,7 @@ function ResumePanelB({
           bullet={{ text: selected.text.trim(), section: selected.section, company: selected.company, roleTitle: selected.roleTitle, bulletIndex: selected.bulletIndex }}
           candidateProfile={candidateProfile}
           resumeText={resumeText}
-          onApply={(idx, company, text) => { onApplyBullet(idx, company, text); setSelected(null); }}
+          onApply={(idx, company, text, meta) => { onApplyBullet(idx, company, text, meta); setSelected(null); }}
           onClose={() => setSelected(null)}
         />
       )}
@@ -510,6 +551,7 @@ export default function ThemeB() {
           resumeText={session.currentResumeText}
           updateCount={session.updateCount}
           candidateProfile={session.candidateProfile}
+          rewriteHistory={session.rewriteHistory}
           onApplyBullet={session.handleApplyBullet}
         />
       </div>
@@ -529,6 +571,7 @@ export default function ThemeB() {
       <div className="hidden md:flex">
         <ScorePanelB
           score={session.resumeScore}
+          scoreHistory={session.scoreHistory}
           onAction={session.handleAction}
           isStreaming={session.isStreaming}
         />

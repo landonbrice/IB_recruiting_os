@@ -13,7 +13,12 @@ interface ResumePanelProps {
   updateCount: number;
   resumeScore: ResumeScore | null;
   candidateProfile: CandidateProfile;
-  onApplyBullet: (bulletIndex: number, company: string, newText: string) => void;
+  onApplyBullet: (
+    bulletIndex: number,
+    company: string,
+    newText: string,
+    meta?: { confidence?: "High" | "Medium" | "Low"; risk?: "Low" | "Medium" | "High" }
+  ) => void;
   onRequestScore: () => void;
 }
 
