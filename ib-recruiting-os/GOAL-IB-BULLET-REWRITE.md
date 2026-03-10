@@ -32,3 +32,8 @@ User can view their parsed resume, click into experience bullets, and get contex
 - Inline before/after diff preview chip for each applied rewrite.
 - Retrieval layer from vetted high-quality IB bullet exemplars.
 - Validator for fabricated or inflated claims before apply.
+
+## Compact Context Pointers
+- Competitive model reference: `context/competitive/resume-worded-model.md`
+- Build execution log: `LOUIS_BUILD_LOG.md`
+- UX pass snapshot: `CHANGELOG-2026-03-10-ux-pass.md`

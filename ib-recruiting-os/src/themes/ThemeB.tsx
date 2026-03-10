@@ -244,16 +244,18 @@ function enrichLines(text: string): EnrichedLine[] {
 }
 
 function ResumePanelB({
-  resumeText, updateCount, candidateProfile, rewriteHistory, onApplyBullet,
+  resumeText, updateCount, candidateProfile, rewriteHistory, onApplyBullet, onAction,
 }: {
   resumeText: string | null;
   updateCount: number;
   candidateProfile: CandidateProfile;
   rewriteHistory: { id: string; company: string; beforeText: string; afterText: string; confidence?: "High" | "Medium" | "Low"; risk?: "Low" | "Medium" | "High" }[];
   onApplyBullet: (idx: number, company: string, text: string, meta?: { confidence?: "High" | "Medium" | "Low"; risk?: "Low" | "Medium" | "High" }) => void;
+  onAction: (action: string) => void;
 }) {
   const [selected, setSelected] = useState<EnrichedLine | null>(null);
   const [activeRewriteId, setActiveRewriteId] = useState<string | null>(null);
+  const [selectedExperience, setSelectedExperience] = useState<string>("");
 
   if (!resumeText) {
     return (
@@ -263,6 +265,8 @@ function ResumePanelB({
     );
   }
   const lines = enrichLines(resumeText);
+  const experienceCompanies = Array.from(new Set(lines.filter(l => l.type === "bullet" && l.company).map(l => l.company))).slice(0, 12);
+  const activeExperience = selectedExperience || experienceCompanies[0] || "";
   const activeRewrite = rewriteHistory.find((r) => r.id === activeRewriteId) ?? rewriteHistory[0] ?? null;
 
   return (
@@ -311,6 +315,41 @@ function ResumePanelB({
                 </div>
               )}
             </>
+          )}
+
+          {experienceCompanies.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Experience actions</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={activeExperience}
+                  onChange={(e) => setSelectedExperience(e.target.value)}
+                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                >
+                  {experienceCompanies.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => onAction(`Rewrite all bullets in my ${activeExperience} experience for IB impact and quantification. Keep claims factual.`)}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:border-amber-300 hover:text-amber-700"
+                >
+                  Rewrite all bullets
+                </button>
+                <button
+                  onClick={() => onAction(`Strengthen weak verbs and ownership language in my ${activeExperience} experience bullets.`)}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:border-amber-300 hover:text-amber-700"
+                >
+                  Strengthen verbs
+                </button>
+                <button
+                  onClick={() => onAction(`Add quantification suggestions for my ${activeExperience} experience bullets without fabricating data.`)}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:border-amber-300 hover:text-amber-700"
+                >
+                  Add quantification
+                </button>
+              </div>
+            </div>
           )}
 
           <div className="rounded-xl border border-slate-200 bg-white px-8 py-8 shadow-sm">
@@ -579,6 +618,7 @@ export default function ThemeB() {
           candidateProfile={session.candidateProfile}
           rewriteHistory={session.rewriteHistory}
           onApplyBullet={session.handleApplyBullet}
+          onAction={session.handleAction}
         />
       </div>
 

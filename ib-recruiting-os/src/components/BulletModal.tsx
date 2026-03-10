@@ -63,6 +63,20 @@ interface Variant {
   risk?: "Low" | "Medium" | "High";
 }
 
+function explainVariant(original: string, rewritten: string): string {
+  const hasNumber = /\b\d+[\d,]*(?:\.\d+)?(?:%|x|m|bn|k)?\b/i.test(rewritten);
+  const strongVerb = /^(modeled|structured|executed|diligenced|synthesized|underwrote|pitched|built|led|analyzed)\b/i.test(rewritten.trim());
+  const mentionsOutcome = /(improv|increas|reduc|drove|result|used in|supported|contribut)/i.test(rewritten);
+
+  const notes: string[] = [];
+  if (strongVerb) notes.push("opens with a stronger IB-style action verb");
+  if (hasNumber) notes.push("adds concrete quantification");
+  if (mentionsOutcome) notes.push("clarifies business impact/outcome");
+
+  if (notes.length === 0) return "Tighter phrasing and clearer ownership than the original bullet.";
+  return `Better because it ${notes.join(", ")}.`;
+}
+
 function parseBullets(raw: string): Variant[] {
   const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
   const out: Variant[] = [];
@@ -270,6 +284,7 @@ export default function BulletModal({
                   >
                     <div className="flex-1">
                       <p className="text-sm text-stone-200 leading-snug">{v.text}</p>
+                      <p className="mt-1 text-[11px] text-stone-400">{explainVariant(bullet.text, v.text)}</p>
                       <div className="mt-2 flex items-center gap-2 text-[10px]">
                         {v.confidence && (
                           <span className={`rounded-full px-2 py-0.5 ${
