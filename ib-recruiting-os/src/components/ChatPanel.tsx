@@ -40,14 +40,25 @@ const MODE_LABELS: Record<string, string> = {
   feasibility: "Feasibility",
 };
 
+const QUICK_PROMPTS = [
+  "Score my resume",
+  "Rewrite my weakest bullet",
+  "Help me tighten my Why IB story",
+  "Give me this week’s networking plan",
+];
+
+const ERROR_MSG = "Something went wrong. Please try again.";
+
 export default function ChatPanel({ messages, isStreaming, onSend, mode, candidateProfile }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const visibleMessages = deduplicateMessages(messages.filter((m) => m.content !== "__resume_uploaded__"));
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isStreaming]);
+    bottomRef.current?.scrollIntoView({ behavior: isStreaming ? "auto" : "smooth" });
+  }, [visibleMessages, isStreaming]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -75,7 +86,7 @@ export default function ChatPanel({ messages, isStreaming, onSend, mode, candida
     <div className="flex h-full flex-col bg-stone-950">
       {/* Header */}
       <div className="border-b border-stone-800 px-5 py-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
             <span className="text-xs font-medium text-stone-400">Coach</span>
@@ -100,16 +111,23 @@ export default function ChatPanel({ messages, isStreaming, onSend, mode, candida
 
       {/* Messages */}
       <div className="scrollable flex-1 space-y-6 px-5 py-5">
-        {messages.length === 0 && (
+        {visibleMessages.length === 0 && (
           <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-stone-600">Upload your resume to begin.</p>
+            <div className="max-w-sm rounded-xl border border-stone-800 bg-stone-900/60 px-4 py-3 text-center">
+              <p className="text-sm text-stone-400">Resume uploaded. Ready when you are.</p>
+              <p className="mt-1 text-xs text-stone-600">Try one of the quick prompts below.</p>
+            </div>
           </div>
         )}
 
-        {messages.map((msg, i) => (
+        {visibleMessages.map((msg, i) => (
           <div key={i} className={msg.role === "user" ? "flex justify-end" : "flex justify-start"}>
             {msg.role === "user" ? (
               <div className="chat-message-user max-w-[85%]">{msg.content}</div>
+            ) : msg._isError ? (
+              <div className="max-w-[95%] rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+                Something went wrong — try sending again.
+              </div>
             ) : (
               <div className="chat-message-assistant max-w-[95%]">
                 <ReactMarkdown
@@ -118,37 +136,37 @@ export default function ChatPanel({ messages, isStreaming, onSend, mode, candida
                     p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
                     strong: ({ children }) => <strong className="font-semibold text-stone-200">{children}</strong>,
                     em: ({ children }) => <em className="italic text-stone-400">{children}</em>,
-                    ul: ({ children }) => <ul className="mb-2 pl-4 space-y-1 list-disc">{children}</ul>,
-                    ol: ({ children }) => <ol className="mb-2 pl-4 space-y-1 list-decimal">{children}</ol>,
+                    ul: ({ children }) => <ul className="mb-2 list-disc space-y-1 pl-4">{children}</ul>,
+                    ol: ({ children }) => <ol className="mb-2 list-decimal space-y-1 pl-4">{children}</ol>,
                     li: ({ children }) => <li className="text-stone-300">{children}</li>,
                     blockquote: ({ children }) => (
-                      <blockquote className="border-l-2 border-amber-600 pl-3 text-stone-400 italic my-2">
+                      <blockquote className="my-2 border-l-2 border-amber-600 pl-3 text-stone-400 italic">
                         {children}
                       </blockquote>
                     ),
                     table: ({ children }) => (
-                      <div className="overflow-x-auto my-2">
-                        <table className="w-full text-xs border-collapse border border-stone-700">{children}</table>
+                      <div className="my-2 overflow-x-auto">
+                        <table className="w-full border-collapse border border-stone-700 text-xs">{children}</table>
                       </div>
                     ),
                     thead: ({ children }) => <thead className="bg-stone-800">{children}</thead>,
                     th: ({ children }) => (
-                      <th className="px-3 py-1.5 text-left border border-stone-700 font-semibold text-stone-300">
+                      <th className="border border-stone-700 px-3 py-1.5 text-left font-semibold text-stone-300">
                         {children}
                       </th>
                     ),
                     td: ({ children }) => (
-                      <td className="px-3 py-1.5 text-left border border-stone-700 text-stone-400">{children}</td>
+                      <td className="border border-stone-700 px-3 py-1.5 text-left text-stone-400">{children}</td>
                     ),
-                    h1: ({ children }) => <h1 className="text-base font-bold text-stone-200 mb-2 mt-3">{children}</h1>,
-                    h2: ({ children }) => <h2 className="text-sm font-bold text-stone-200 mb-1.5 mt-3">{children}</h2>,
-                    h3: ({ children }) => <h3 className="text-sm font-semibold text-stone-300 mb-1 mt-2">{children}</h3>,
+                    h1: ({ children }) => <h1 className="mb-2 mt-3 text-base font-bold text-stone-200">{children}</h1>,
+                    h2: ({ children }) => <h2 className="mb-1.5 mt-3 text-sm font-bold text-stone-200">{children}</h2>,
+                    h3: ({ children }) => <h3 className="mb-1 mt-2 text-sm font-semibold text-stone-300">{children}</h3>,
                     code: ({ children }) => (
-                      <code className="rounded bg-stone-800 px-1 py-0.5 text-xs font-mono text-amber-400">
+                      <code className="rounded bg-stone-800 px-1 py-0.5 font-mono text-xs text-amber-400">
                         {children}
                       </code>
                     ),
-                    hr: () => <hr className="border-stone-700 my-3" />,
+                    hr: () => <hr className="my-3 border-stone-700" />,
                   }}
                 >
                   {stripCodeBlocks(msg.content)}
@@ -160,10 +178,11 @@ export default function ChatPanel({ messages, isStreaming, onSend, mode, candida
 
         {isStreaming && (
           <div className="flex justify-start">
-            <div className="flex items-center gap-1 px-1 py-2">
+            <div className="flex items-center gap-2 rounded-lg border border-stone-800 bg-stone-900/60 px-3 py-2">
               <span className="typing-dot h-1.5 w-1.5 rounded-full bg-stone-500" />
               <span className="typing-dot h-1.5 w-1.5 rounded-full bg-stone-500" />
               <span className="typing-dot h-1.5 w-1.5 rounded-full bg-stone-500" />
+              <span className="ml-1 text-xs text-stone-600">thinking</span>
             </div>
           </div>
         )}
@@ -173,6 +192,19 @@ export default function ChatPanel({ messages, isStreaming, onSend, mode, candida
 
       {/* Input */}
       <div className="border-t border-stone-800 px-4 py-4">
+        <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1">
+          {QUICK_PROMPTS.map((prompt) => (
+            <button
+              key={prompt}
+              onClick={() => !isStreaming && onSend(prompt)}
+              disabled={isStreaming}
+              className="shrink-0 rounded-full border border-stone-700 bg-stone-900 px-3 py-1 text-[11px] text-stone-400 transition hover:border-amber-700/60 hover:text-amber-300 disabled:opacity-40"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+
         <form onSubmit={handleSubmit} className="flex items-end gap-3">
           <textarea
             ref={textareaRef}
@@ -221,4 +253,19 @@ function buildProfileChips(profile: CandidateProfile): string[] {
   }
   if (profile.networkingPosture) chips.push(NETWORKING_LABELS[profile.networkingPosture] ?? profile.networkingPosture);
   return chips;
+}
+
+function deduplicateMessages(messages: Message[]): (Message & { _isError?: boolean })[] {
+  const out: (Message & { _isError?: boolean })[] = [];
+  for (const msg of messages) {
+    const isErr = msg.role === "assistant" && msg.content === ERROR_MSG;
+    if (isErr) {
+      const last = out[out.length - 1];
+      if (last?._isError) continue;
+      out.push({ ...msg, _isError: true });
+      continue;
+    }
+    out.push({ ...msg });
+  }
+  return out;
 }

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import ScoreCard from "./ScoreCard";
 import BulletModal, { type SelectedBullet } from "./BulletModal";
 import type { ResumeScore, CandidateProfile } from "@/lib/types";
+import { enrichResumeLines, type EnrichedLine } from "@/lib/resumeStructure";
 
 interface ResumePanelProps {
   resumeText: string | null;
@@ -20,101 +21,6 @@ interface ResumePanelProps {
     meta?: { confidence?: "High" | "Medium" | "Low"; risk?: "Low" | "Medium" | "High" }
   ) => void;
   onRequestScore: () => void;
-}
-
-// ── Enriched line types ───────────────────────────────────────────────────────
-
-interface EnrichedLine {
-  text: string;
-  rawIndex: number;
-  type: "blank" | "section-header" | "bullet" | "other";
-  section: string;
-  company: string;
-  roleTitle: string;
-  bulletIndex: number; // -1 for non-bullets
-}
-
-function isHeader(trimmed: string): boolean {
-  return (
-    trimmed.length < 60 &&
-    (trimmed === trimmed.toUpperCase() ||
-      /^(Education|Experience|Skills|Activities|Leadership|Projects|Summary|Objective|Work Experience|Extracurriculars)/i.test(
-        trimmed
-      ))
-  );
-}
-
-function enrichLines(text: string): EnrichedLine[] {
-  const raw = text.split("\n");
-  const result: EnrichedLine[] = [];
-
-  let currentSection = "";
-  let currentCompany = "";
-  let currentRoleTitle = "";
-  let bulletIndexInCompany = 0;
-  let lastWasBullet = false;
-
-  for (let i = 0; i < raw.length; i++) {
-    const line = raw[i];
-    const trimmed = line.trim();
-
-    if (!trimmed) {
-      result.push({ text: line, rawIndex: i, type: "blank", section: currentSection, company: currentCompany, roleTitle: currentRoleTitle, bulletIndex: -1 });
-      lastWasBullet = false;
-      continue;
-    }
-
-    if (isHeader(trimmed)) {
-      currentSection = trimmed;
-      currentCompany = "";
-      currentRoleTitle = "";
-      bulletIndexInCompany = 0;
-      lastWasBullet = false;
-      result.push({ text: line, rawIndex: i, type: "section-header", section: currentSection, company: currentCompany, roleTitle: currentRoleTitle, bulletIndex: -1 });
-      continue;
-    }
-
-    if (/^[▪•\-·]/.test(trimmed)) {
-      if (!lastWasBullet) {
-        // First bullet under a new company block — reset counter
-        bulletIndexInCompany = 0;
-      }
-      result.push({
-        text: line,
-        rawIndex: i,
-        type: "bullet",
-        section: currentSection,
-        company: currentCompany,
-        roleTitle: currentRoleTitle,
-        bulletIndex: bulletIndexInCompany,
-      });
-      bulletIndexInCompany++;
-      lastWasBullet = true;
-      continue;
-    }
-
-    // Non-bullet, non-header: treat as role title or company line
-    // Heuristic: if previous line was a header or another role line and not bullet, it's probably a company/role line
-    if (!lastWasBullet) {
-      // Could be company name or role title — alternate assignment
-      if (!currentCompany) {
-        currentCompany = trimmed;
-        bulletIndexInCompany = 0;
-      } else if (!currentRoleTitle) {
-        currentRoleTitle = trimmed;
-      } else {
-        // Likely a new company block
-        currentCompany = trimmed;
-        currentRoleTitle = "";
-        bulletIndexInCompany = 0;
-      }
-    }
-
-    result.push({ text: line, rawIndex: i, type: "other", section: currentSection, company: currentCompany, roleTitle: currentRoleTitle, bulletIndex: -1 });
-    lastWasBullet = false;
-  }
-
-  return result;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -147,7 +53,7 @@ export default function ResumePanel({
   }, [resumeFile]);
 
   const enrichedLines = useMemo(
-    () => (resumeText ? enrichLines(resumeText) : []),
+    () => (resumeText ? enrichResumeLines(resumeText) : []),
     [resumeText]
   );
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { CandidateProfile } from "@/lib/types";
+import { consumeSSE } from "@/lib/sse";
 
 export interface SelectedBullet {
   text: string;
@@ -35,26 +36,7 @@ async function streamSuggest(
   });
   if (!res.ok || !res.body) throw new Error("Suggest stream failed");
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value, { stream: true });
-    for (const line of chunk.split("\n")) {
-      if (!line.startsWith("data: ")) continue;
-      const data = line.slice(6);
-      if (data === "[DONE]") return;
-      try {
-        const parsed = JSON.parse(data);
-        const text = parsed.delta?.text ?? "";
-        if (text) onChunk(text);
-      } catch {
-        // skip malformed chunks
-      }
-    }
-  }
+  await consumeSSE(res.body, onChunk);
 }
 
 interface Variant {
@@ -123,6 +105,7 @@ export default function BulletModal({
   const [streamText, setStreamText] = useState("");
   const [variants, setVariants] = useState<Variant[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // Auto-stream clarifying question on mount
@@ -130,6 +113,7 @@ export default function BulletModal({
     let cancelled = false;
     setIsStreaming(true);
     setQuestion("");
+    setErrorText(null);
 
     streamSuggest(
       {
@@ -144,9 +128,16 @@ export default function BulletModal({
       (text) => {
         if (!cancelled) setQuestion((prev) => prev + text);
       }
-    ).finally(() => {
-      if (!cancelled) setIsStreaming(false);
-    });
+    )
+      .catch((err) => {
+        if (!cancelled) {
+          setErrorText("Couldn’t generate a clarifying question. You can still skip and generate rewrites.");
+          console.error("bullet question stream failed", err);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsStreaming(false);
+      });
 
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -155,30 +146,38 @@ export default function BulletModal({
     setPhase("generating");
     setStreamText("");
     setVariants([]);
+    setErrorText(null);
     setIsStreaming(true);
 
     let accumulated = "";
-    await streamSuggest(
-      {
-        bullet: bullet.text,
-        roleTitle: bullet.roleTitle,
-        company: bullet.company,
-        section: bullet.section,
-        candidateProfile,
-        resumeText,
-        phase: "generate",
-        question: skip ? undefined : question,
-        answer: skip ? undefined : userAnswer,
-      },
-      (text) => {
-        accumulated += text;
-        setStreamText(accumulated);
-      }
-    );
+    try {
+      await streamSuggest(
+        {
+          bullet: bullet.text,
+          roleTitle: bullet.roleTitle,
+          company: bullet.company,
+          section: bullet.section,
+          candidateProfile,
+          resumeText,
+          phase: "generate",
+          question: skip ? undefined : question,
+          answer: skip ? undefined : userAnswer,
+        },
+        (text) => {
+          accumulated += text;
+          setStreamText(accumulated);
+        }
+      );
 
-    setVariants(parseBullets(accumulated));
-    setPhase("results");
-    setIsStreaming(false);
+      setVariants(parseBullets(accumulated));
+      setPhase("results");
+    } catch (err) {
+      setErrorText("Rewrite generation failed. Please try again.");
+      setPhase("question");
+      console.error("bullet generate stream failed", err);
+    } finally {
+      setIsStreaming(false);
+    }
   }
 
   function handleApply(v: Variant) {
@@ -245,6 +244,12 @@ export default function BulletModal({
                 className="w-full bg-stone-800 border border-stone-700 rounded-lg text-sm text-stone-200 placeholder:text-stone-600 px-3 py-2 resize-none focus:outline-none focus:border-amber-700/60"
               />
             )}
+          </div>
+        )}
+
+        {errorText && (
+          <div className="mb-4 rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-2 text-xs text-red-200">
+            {errorText}
           </div>
         )}
 

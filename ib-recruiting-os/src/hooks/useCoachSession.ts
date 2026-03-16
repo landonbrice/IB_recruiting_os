@@ -14,6 +14,7 @@ import {
   parseResumeUpdates,
   detectMode,
 } from "@/lib/protocolParser";
+import { consumeSSE } from "@/lib/sse";
 import { logEvent } from "@/lib/sessionLog";
 import type {
   Message,
@@ -254,27 +255,14 @@ export function useCoachSession() {
       });
       if (!res.ok || !res.body) throw new Error("Stream failed");
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        for (const line of chunk.split("\n")) {
-          if (!line.startsWith("data: ")) continue;
-          const raw = line.slice(6);
-          if (raw === "[DONE]") break;
-          try {
-            const parsed = JSON.parse(raw) as { delta?: { text?: string } };
-            assistantContent += parsed.delta?.text ?? "";
-            setMessages(prev => {
-              const u = [...prev];
-              u[u.length - 1] = { role: "assistant", content: assistantContent };
-              return u;
-            });
-          } catch {/* skip */}
-        }
-      }
+      await consumeSSE(res.body, (text) => {
+        assistantContent += text;
+        setMessages(prev => {
+          const u = [...prev];
+          u[u.length - 1] = { role: "assistant", content: assistantContent };
+          return u;
+        });
+      });
 
       const newMode = detectMode(assistantContent);
       if (newMode && newMode !== mode) {

@@ -5,16 +5,11 @@
  * Score and metrics are always visible — no sidebar toggle needed.
  * Resume is always present on the left. Chat is the center channel.
  * Feels like a professional SaaS tool (Notion/Linear energy, not a chatbot).
- *
- * What works from the competition:
- * - ResumeWorded shows score immediately, front-and-center — users respond to seeing the number fast
- * - Three-column keeps resume + chat + score in view simultaneously (no tab-switching)
- * - Light background makes the resume feel like a real document, not a textarea
  */
 
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import BulletModal from "@/components/BulletModal";
@@ -22,8 +17,9 @@ import IntakeForm from "@/components/IntakeForm";
 import ExportModal from "@/components/ExportModal";
 import { useCoachSession } from "@/hooks/useCoachSession";
 import type { ResumeScore, Message, CandidateProfile } from "@/lib/types";
+import { enrichResumeLines, type EnrichedLine } from "@/lib/resumeStructure";
 
-// ── Score Panel (always visible, right column) ────────────────────────────────
+// ── Score Panel ───────────────────────────────────────────────────────────────
 
 const RADIUS = 44;
 const CIRC = 2 * Math.PI * RADIUS;
@@ -34,33 +30,70 @@ function scoreColor(n: number) {
   return "#ef4444";
 }
 
-function ScorePanelB({ score, scoreHistory, onAction, isStreaming }: {
+function ScoreIcon({ path }: { path: string }) {
+  return (
+    <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d={path} />
+    </svg>
+  );
+}
+
+function ScorePanelB({ score, scoreHistory, onAction, isStreaming, onExport, currentResumeText, onNewSession }: {
   score: ResumeScore | null;
   scoreHistory: { total: number; createdAt: number }[];
   onAction: (a: string) => void;
   isStreaming: boolean;
+  onExport: () => void;
+  currentResumeText: string | null;
+  onNewSession: () => void;
 }) {
+  const actions: { label: string; action: string; icon: string }[] = [
+    {
+      label: "Score Resume",
+      action: "Score my resume",
+      icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
+    },
+    {
+      label: "Weak Verb Scan",
+      action: "Scan my resume for weak verbs and suggest replacements",
+      icon: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
+    },
+    {
+      label: "Develop Story",
+      action: "Let's develop my Why-IB story — ask me one question at a time",
+      icon: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z",
+    },
+    {
+      label: "Cover Letter",
+      action: "Generate a cover letter based on everything we've discussed",
+      icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+    },
+    {
+      label: "Networking Plan",
+      action: "Give me a concrete networking action plan for this week — specific steps, not general advice",
+      icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
+    },
+  ];
+
   return (
-    <div className="flex h-full w-72 shrink-0 flex-col border-l border-slate-200 bg-white">
+    <div className="flex h-full w-60 shrink-0 flex-col border-l border-slate-200 bg-white">
       {/* Header */}
-      <div className="border-b border-slate-200 px-5 py-4">
-        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-          Resume Score
-        </p>
+      <div className="border-b border-slate-200 px-4 py-3.5">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Resume Score</p>
       </div>
 
       {/* Gauge */}
-      <div className="flex flex-col items-center px-5 py-6 border-b border-slate-100">
+      <div className="flex flex-col items-center px-4 py-5 border-b border-slate-100">
         {score ? (
           <>
             <div className="relative">
-              <svg width="110" height="110" viewBox="0 0 110 110" className="-rotate-90">
-                <circle cx="55" cy="55" r={RADIUS} fill="none" stroke="#f1f5f9" strokeWidth="10" />
+              <svg width="104" height="104" viewBox="0 0 110 110" className="-rotate-90">
+                <circle cx="55" cy="55" r={RADIUS} fill="none" stroke="#f1f5f9" strokeWidth="9" />
                 <circle
                   cx="55" cy="55" r={RADIUS}
                   fill="none"
                   stroke={scoreColor(score.total)}
-                  strokeWidth="10"
+                  strokeWidth="9"
                   strokeLinecap="round"
                   strokeDasharray={CIRC}
                   strokeDashoffset={CIRC * (1 - score.total / 100)}
@@ -72,16 +105,18 @@ function ScorePanelB({ score, scoreHistory, onAction, isStreaming }: {
                 <span className="text-[10px] text-slate-400">/ 100</span>
               </div>
             </div>
+
+            {/* Category bars */}
             <div className="mt-4 w-full space-y-2">
               {score.categories.map(cat => (
                 <div key={cat.name}>
-                  <div className="mb-1 flex justify-between text-xs">
+                  <div className="mb-0.5 flex justify-between text-[11px]">
                     <span className="text-slate-500">{cat.name}</span>
                     <span className="font-semibold text-slate-700">{cat.score}</span>
                   </div>
-                  <div className="h-1.5 w-full rounded-full bg-slate-100">
+                  <div className="h-1 w-full rounded-full bg-slate-100">
                     <div
-                      className="h-1.5 rounded-full transition-all duration-500"
+                      className="h-1 rounded-full transition-all duration-500"
                       style={{ width: `${cat.score}%`, backgroundColor: scoreColor(cat.score) }}
                     />
                   </div>
@@ -90,53 +125,53 @@ function ScorePanelB({ score, scoreHistory, onAction, isStreaming }: {
             </div>
           </>
         ) : (
-          <div className="py-6 text-center">
-            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-slate-200">
-              <span className="text-xl text-slate-300">?</span>
+          <div className="py-4 text-center">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-slate-200">
+              <span className="text-lg text-slate-300">?</span>
             </div>
-            <p className="text-xs text-slate-400">Score appears after intake</p>
+            <p className="text-[11px] text-slate-400">Score appears after intake</p>
           </div>
         )}
       </div>
 
       {/* Score trend */}
       {scoreHistory.length > 1 && (
-        <div className="border-b border-slate-100 px-5 py-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Score Trend</p>
-          <div className="flex items-end gap-1 h-12">
-            {scoreHistory.slice(-8).map((p, i, arr) => {
-              const h = Math.max(10, Math.round((p.total / 100) * 44));
-              const up = i > 0 && p.total > arr[i - 1].total;
+        <div className="border-b border-slate-100 px-4 py-3">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Trend</p>
+          <div className="flex items-end gap-0.5 h-8">
+            {scoreHistory.slice(-10).map((p, i, arr) => {
+              const h = Math.max(4, Math.round((p.total / 100) * 28));
+              const up = i > 0 && p.total >= arr[i - 1].total;
               return (
                 <div key={`${p.createdAt}-${i}`} className="flex-1">
                   <div
-                    title={`Score: ${p.total}`}
-                    className={`w-full rounded-t ${up ? "bg-emerald-400" : "bg-slate-300"}`}
+                    title={`${p.total}`}
+                    className={`w-full rounded-sm ${up ? "bg-emerald-400" : "bg-slate-200"}`}
                     style={{ height: `${h}px` }}
                   />
                 </div>
               );
             })}
           </div>
-          <p className="mt-2 text-[11px] text-slate-500">
-            Started {scoreHistory[0]?.total} → Now {scoreHistory[scoreHistory.length - 1]?.total}
+          <p className="mt-1.5 text-[10px] text-slate-400">
+            {scoreHistory[0]?.total} → {scoreHistory[scoreHistory.length - 1]?.total}
           </p>
         </div>
       )}
 
-      {/* Issues */}
+      {/* Fix these */}
       {score && score.hurting.length > 0 && (
-        <div className="border-b border-slate-100 px-5 py-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">Fix These</p>
-          <ul className="space-y-2">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Fix These</p>
+          <ul className="space-y-1.5">
             {score.hurting.slice(0, 3).map(item => (
               <li key={item}>
                 <button
                   onClick={() => onAction(`Let's work on improving: ${item}`)}
                   disabled={isStreaming}
-                  className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                  className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-[11px] text-slate-600 transition hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
                 >
-                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
                   {item}
                 </button>
               </li>
@@ -147,12 +182,12 @@ function ScorePanelB({ score, scoreHistory, onAction, isStreaming }: {
 
       {/* What's working */}
       {score && score.working.length > 0 && (
-        <div className="border-b border-slate-100 px-5 py-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">Strengths</p>
+        <div className="border-b border-slate-100 px-4 py-3">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Strengths</p>
           <ul className="space-y-1.5">
-            {score.working.map(item => (
-              <li key={item} className="flex items-start gap-2 text-xs text-slate-500">
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+            {score.working.slice(0, 3).map(item => (
+              <li key={item} className="flex items-start gap-2 px-2 text-[11px] text-slate-500">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
                 {item}
               </li>
             ))}
@@ -162,86 +197,49 @@ function ScorePanelB({ score, scoreHistory, onAction, isStreaming }: {
 
       {/* Next step */}
       {score?.nextStep && (
-        <div className="px-5 py-4">
-          <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-amber-600">Next Step</p>
-          <p className="text-xs leading-relaxed text-slate-600">{score.nextStep}</p>
+        <div className="border-b border-slate-100 px-4 py-3">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-amber-600">Next Step</p>
+          <p className="text-[11px] leading-relaxed text-slate-600">{score.nextStep}</p>
         </div>
       )}
 
       <div className="flex-1" />
 
       {/* Quick actions */}
-      <div className="border-t border-slate-100 px-4 py-3 space-y-1">
-        {[
-          ["Score Resume", "Score my resume"],
-          ["Weak Verb Scan", "Scan my resume for weak verbs and suggest replacements"],
-          ["Cover Letter", "Generate a cover letter based on everything we've discussed"],
-          ["Networking Plan", "Give me a concrete networking action plan for this week"],
-        ].map(([label, action]) => (
+      <div className="border-t border-slate-100 px-3 py-3 space-y-0.5">
+        {actions.map(({ label, action, icon }) => (
           <button
             key={label}
             onClick={() => onAction(action)}
             disabled={isStreaming}
-            className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-800 disabled:opacity-40"
           >
+            <ScoreIcon path={icon} />
             {label}
           </button>
         ))}
+        <button
+          onClick={onExport}
+          disabled={!currentResumeText}
+          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-800 disabled:opacity-40"
+        >
+          <ScoreIcon path="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          Export Pack
+        </button>
+        <button
+          onClick={onNewSession}
+          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
+        >
+          <ScoreIcon path="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          New Session
+        </button>
       </div>
     </div>
   );
 }
 
-// ── Light Resume Panel ────────────────────────────────────────────────────────
+// ── Resume Panel ──────────────────────────────────────────────────────────────
 
-interface EnrichedLine {
-  text: string;
-  rawIndex: number;
-  type: "blank" | "section-header" | "bullet" | "other";
-  company: string;
-  roleTitle: string;
-  section: string;
-  bulletIndex: number;
-}
-
-function enrichLines(text: string): EnrichedLine[] {
-  const raw = text.split("\n");
-  const result: EnrichedLine[] = [];
-  let currentSection = "", currentCompany = "", currentRoleTitle = "";
-  let bulletIdx = 0, lastWasBullet = false;
-
-  for (let i = 0; i < raw.length; i++) {
-    const line = raw[i];
-    const trimmed = line.trim();
-    if (!trimmed) {
-      result.push({ text: line, rawIndex: i, type: "blank", section: currentSection, company: currentCompany, roleTitle: currentRoleTitle, bulletIndex: -1 });
-      lastWasBullet = false;
-      continue;
-    }
-    const isHeader = trimmed.length < 60 &&
-      (trimmed === trimmed.toUpperCase() ||
-       /^(Education|Experience|Skills|Activities|Leadership|Projects|Summary|Objective|Work Experience)/i.test(trimmed));
-    if (isHeader) {
-      currentSection = trimmed; currentCompany = ""; currentRoleTitle = ""; bulletIdx = 0; lastWasBullet = false;
-      result.push({ text: line, rawIndex: i, type: "section-header", section: currentSection, company: currentCompany, roleTitle: currentRoleTitle, bulletIndex: -1 });
-      continue;
-    }
-    if (/^[▪•\-·]/.test(trimmed)) {
-      if (!lastWasBullet) bulletIdx = 0;
-      result.push({ text: line, rawIndex: i, type: "bullet", section: currentSection, company: currentCompany, roleTitle: currentRoleTitle, bulletIndex: bulletIdx });
-      bulletIdx++; lastWasBullet = true;
-      continue;
-    }
-    if (!lastWasBullet) {
-      if (!currentCompany) { currentCompany = trimmed; bulletIdx = 0; }
-      else if (!currentRoleTitle) { currentRoleTitle = trimmed; }
-      else { currentCompany = trimmed; currentRoleTitle = ""; bulletIdx = 0; }
-    }
-    result.push({ text: line, rawIndex: i, type: "other", section: currentSection, company: currentCompany, roleTitle: currentRoleTitle, bulletIndex: -1 });
-    lastWasBullet = false;
-  }
-  return result;
-}
 
 function ResumePanelB({
   resumeText, updateCount, candidateProfile, rewriteHistory, onApplyBullet, onAction,
@@ -264,52 +262,60 @@ function ResumePanelB({
       </div>
     );
   }
-  const lines = enrichLines(resumeText);
-  const experienceCompanies = Array.from(new Set(lines.filter(l => l.type === "bullet" && l.company).map(l => l.company))).slice(0, 12);
+
+  const lines = enrichResumeLines(resumeText);
+  const experienceCompanies = Array.from(new Set(
+    lines.filter(l => l.type === "bullet" && l.company).map(l => l.company)
+  )).slice(0, 12);
   const activeExperience = selectedExperience || experienceCompanies[0] || "";
-  const activeRewrite = rewriteHistory.find((r) => r.id === activeRewriteId) ?? rewriteHistory[0] ?? null;
+  const activeRewrite = rewriteHistory.find(r => r.id === activeRewriteId) ?? rewriteHistory[0] ?? null;
 
   return (
-    <div className="flex h-full flex-col bg-slate-50">
-      <div className="border-b border-slate-200 px-5 py-3 flex items-center justify-between">
-        <p className="text-xs font-semibold text-slate-500">Resume</p>
+    <div className="flex h-full flex-col bg-white">
+      {/* Header */}
+      <div className="border-b border-slate-200 px-5 py-3 flex items-center justify-between bg-white">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Resume</p>
         {updateCount > 0 && (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
             {updateCount} edit{updateCount !== 1 ? "s" : ""}
           </span>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto px-8 py-8">
-        <div className="mx-auto max-w-[600px] space-y-3">
+
+      <div className="flex-1 overflow-y-auto bg-slate-50 px-5 py-5">
+        <div className="mx-auto max-w-[580px] space-y-3">
+
+          {/* Rewrite history bubbles */}
           {rewriteHistory.length > 0 && (
             <>
-              <div className="flex flex-wrap gap-2">
-                {rewriteHistory.slice(0, 4).map((r) => (
+              <div className="flex flex-wrap gap-1.5">
+                {rewriteHistory.slice(0, 4).map(r => (
                   <button
                     key={r.id}
                     onClick={() => setActiveRewriteId(r.id)}
-                    className={`rounded-full border px-3 py-1 text-[11px] shadow-sm transition ${
+                    className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
                       activeRewriteId === r.id
                         ? "border-amber-300 bg-amber-50 text-amber-800"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-amber-200"
+                        : "border-slate-200 bg-white text-slate-500 hover:border-amber-200 hover:text-slate-700"
                     }`}
                   >
                     <span className="font-medium">{r.company}</span>
-                    {r.confidence && <span className="ml-1 text-emerald-600">• {r.confidence}</span>}
-                    {r.risk && <span className="ml-1 text-amber-600">risk {r.risk.toLowerCase()}</span>}
+                    {r.confidence && <span className="ml-1 text-emerald-600">· {r.confidence}</span>}
                   </button>
                 ))}
               </div>
 
               {activeRewrite && (
                 <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Last applied rewrite</p>
-                  <div className="space-y-2 text-[12px]">
-                    <div className="rounded-lg bg-red-50 p-2 text-red-800">
-                      <span className="mr-2 font-semibold">Before</span>{activeRewrite.beforeText || "(No previous bullet captured)"}
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Last rewrite</p>
+                  <div className="space-y-1.5 text-[11px]">
+                    <div className="rounded-lg bg-red-50 p-2 text-red-700">
+                      <span className="mr-1.5 font-semibold">Before</span>
+                      {activeRewrite.beforeText || "(No previous text captured)"}
                     </div>
                     <div className="rounded-lg bg-emerald-50 p-2 text-emerald-800">
-                      <span className="mr-2 font-semibold">After</span>{activeRewrite.afterText}
+                      <span className="mr-1.5 font-semibold">After</span>
+                      {activeRewrite.afterText}
                     </div>
                   </div>
                 </div>
@@ -317,65 +323,77 @@ function ResumePanelB({
             </>
           )}
 
+          {/* Experience actions */}
           {experienceCompanies.length > 0 && (
             <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Experience actions</p>
-              <div className="flex flex-wrap items-center gap-2">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Experience actions</p>
+              <div className="flex flex-wrap items-center gap-1.5">
                 <select
                   value={activeExperience}
-                  onChange={(e) => setSelectedExperience(e.target.value)}
-                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                  onChange={e => setSelectedExperience(e.target.value)}
+                  className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-700 focus:border-amber-400 focus:outline-none"
                 >
-                  {experienceCompanies.map((c) => (
+                  {experienceCompanies.map(c => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
                 <button
                   onClick={() => onAction(`Rewrite all bullets in my ${activeExperience} experience for IB impact and quantification. Keep claims factual.`)}
-                  className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:border-amber-300 hover:text-amber-700"
+                  className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] text-slate-600 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700"
                 >
-                  Rewrite all bullets
+                  Rewrite all
                 </button>
                 <button
                   onClick={() => onAction(`Strengthen weak verbs and ownership language in my ${activeExperience} experience bullets.`)}
-                  className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:border-amber-300 hover:text-amber-700"
+                  className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] text-slate-600 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700"
                 >
-                  Strengthen verbs
+                  Verbs
                 </button>
                 <button
                   onClick={() => onAction(`Add quantification suggestions for my ${activeExperience} experience bullets without fabricating data.`)}
-                  className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:border-amber-300 hover:text-amber-700"
+                  className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] text-slate-600 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700"
                 >
-                  Add quantification
+                  Quantify
                 </button>
               </div>
             </div>
           )}
 
-          <div className="rounded-xl border border-slate-200 bg-white px-8 py-8 shadow-sm">
-            {lines.map(el => {
-              const key = el.rawIndex;
+          {/* Resume document */}
+          <div className="rounded-xl border border-slate-200 bg-white px-7 py-7 shadow-sm">
+            {lines.map((el, idx) => {
               const t = el.text.trim();
-              if (el.type === "blank") return <div key={key} className="h-2" />;
+              if (el.type === "blank") return <div key={el.rawIndex} className="h-2" />;
               if (el.type === "section-header") return (
-                <h2 key={key} className="mt-4 mb-1 border-b border-slate-800 pb-0.5 text-[10pt] font-bold uppercase tracking-wide text-slate-900">{t}</h2>
+                <h2 key={el.rawIndex} className="mt-4 mb-1 border-b border-slate-300 pb-0.5 text-[10pt] font-bold uppercase tracking-wide text-slate-800">
+                  {t}
+                </h2>
               );
               if (el.type === "bullet") {
                 const clickable = !!el.company;
                 return (
-                  <p key={key}
+                  <p
+                    key={el.rawIndex}
                     onClick={clickable ? () => setSelected(el) : undefined}
-                    title={clickable ? "Click to rewrite" : undefined}
-                    className={`mb-0.5 pl-4 text-[10pt] leading-snug text-slate-800 ${clickable ? "cursor-pointer rounded hover:bg-amber-50 transition-colors" : ""}`}>
+                    title={clickable ? "Click to rewrite this bullet" : undefined}
+                    className={`mb-0.5 pl-4 text-[10pt] leading-snug text-slate-700 ${
+                      clickable ? "cursor-pointer rounded transition-colors hover:bg-amber-50 hover:text-slate-900" : ""
+                    }`}
+                  >
                     {t}
                   </p>
                 );
               }
-              return <p key={key} className={`mb-0.5 text-[10pt] leading-snug text-slate-800 ${key === 0 ? "text-center text-[14pt] font-bold" : ""}`}>{t}</p>;
+              return (
+                <p key={el.rawIndex} className={`mb-0.5 text-[10pt] leading-snug text-slate-700 ${idx === 0 ? "text-center text-[14pt] font-bold text-slate-900" : ""}`}>
+                  {t}
+                </p>
+              );
             })}
           </div>
         </div>
       </div>
+
       {selected && (
         <BulletModal
           bullet={{ text: selected.text.trim(), section: selected.section, company: selected.company, roleTitle: selected.roleTitle, bulletIndex: selected.bulletIndex }}
@@ -389,134 +407,267 @@ function ResumePanelB({
   );
 }
 
-// ── Chat Panel B (light) ──────────────────────────────────────────────────────
+// ── Chat Panel ────────────────────────────────────────────────────────────────
+
+const ERROR_MSG = "Something went wrong. Please try again.";
 
 function stripProtocol(text: string) {
   return text.replace(/```[\w-]+\n[\s\S]*?```/g, "").trim();
 }
 
-function ChatPanelB({ messages, isStreaming, onSend, mode, candidateProfile }: {
+function isErrorMsg(content: string) {
+  return content === ERROR_MSG;
+}
+
+// Collapse consecutive error messages into the last one
+function deduplicateMessages(messages: Message[]): (Message & { _isError?: boolean })[] {
+  const out: (Message & { _isError?: boolean })[] = [];
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    const err = msg.role === "assistant" && isErrorMsg(msg.content);
+    if (err) {
+      // If last item is already an error, skip this one
+      const last = out[out.length - 1];
+      if (last && last._isError) continue;
+      out.push({ ...msg, _isError: true });
+    } else {
+      out.push({ ...msg });
+    }
+  }
+  return out;
+}
+
+function ChatPanelB({ messages, isStreaming, onSend, mode, candidateProfile, resumeScore }: {
   messages: Message[];
   isStreaming: boolean;
   onSend: (s: string) => void;
   mode: string;
   candidateProfile: CandidateProfile;
+  resumeScore: ResumeScore | null;
 }) {
   const [input, setInput] = useState("");
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isStreaming]);
 
   const MODE_LABELS: Record<string, string> = {
-    diagnostic: "Diagnostic", editing: "Editing", story: "Story",
-    targeting: "Targeting", feasibility: "Feasibility",
+    diagnostic: "Diagnostic",
+    editing: "Editing",
+    story: "Story",
+    targeting: "Targeting",
+    feasibility: "Feasibility",
   };
 
   const quickPrompts = [
-    "Score my resume in plain English",
+    "Score my resume",
     "Rewrite my weakest bullet",
-    "Give me 3 concrete networking actions",
+    "3 networking actions",
+    "Why IB story help",
   ];
+
+  // Derive session progress from messages + score
+  const hasScore = resumeScore !== null;
+  const hasEdits = messages.some(m => m.role === "user" && m.content.toLowerCase().includes("rewrite"));
+  const hasStory = messages.some(m => m.role === "assistant" && (m.content.toLowerCase().includes("why ib") || m.content.includes("story-output")));
+
+  const visibleMessages = messages.filter(m => m.content !== "__resume_uploaded__");
+  const dedupedMessages = deduplicateMessages(visibleMessages);
+
+  function handleSend() {
+    if (!input.trim() || isStreaming) return;
+    onSend(input.trim());
+    setInput("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+  }
 
   return (
     <div className="flex h-full flex-col bg-white">
+      {/* Header */}
       <div className="border-b border-slate-200 px-5 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-amber-500" />
-          <span className="text-sm font-semibold text-slate-700">IB Resume Coach</span>
+          <span className="text-sm font-semibold text-slate-800">IB Resume Coach</span>
         </div>
-        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
-          {MODE_LABELS[mode] ?? "Diagnostic"}
-        </span>
+        <div className="flex items-center gap-2">
+          {/* Session progress pills */}
+          <div className="hidden sm:flex items-center gap-1">
+            {[
+              { label: "Scored", done: hasScore },
+              { label: "Edited", done: hasEdits },
+              { label: "Story", done: hasStory },
+            ].map(({ label, done }) => (
+              <span
+                key={label}
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                  done
+                    ? "bg-emerald-50 text-emerald-600"
+                    : "bg-slate-100 text-slate-400"
+                }`}
+              >
+                {done ? "✓ " : ""}{label}
+              </span>
+            ))}
+          </div>
+          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-500">
+            {MODE_LABELS[mode] ?? "Diagnostic"}
+          </span>
+        </div>
       </div>
 
+      {/* Profile context chips */}
       {Object.keys(candidateProfile).length > 0 && (
         <div className="border-b border-slate-100 px-5 py-2 flex flex-wrap gap-1.5">
           {candidateProfile.schoolTier && (
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-500 capitalize">{candidateProfile.schoolTier}</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] text-slate-500 capitalize">
+              {candidateProfile.schoolTier}
+            </span>
           )}
           {candidateProfile.stage && (
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-500 capitalize">{candidateProfile.stage}</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] text-slate-500 capitalize">
+              {candidateProfile.stage}
+            </span>
           )}
           {candidateProfile.targetBank && (
-            <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs text-amber-700">{candidateProfile.targetBank}</span>
+            <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] text-amber-700">
+              {candidateProfile.targetBank}
+            </span>
           )}
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto space-y-5 px-5 py-5">
-        {messages.length === 0 && (
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+        {dedupedMessages.length === 0 && (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
             <p className="text-sm font-semibold text-slate-700">Coach is ready.</p>
-            <p className="mt-1 text-sm text-slate-500">Ask for bullet rewrites, story coaching, or a straight feasibility read.</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Upload your resume and complete intake to get your IB score, targeted bullet rewrites, and a networking action plan.
+            </p>
           </div>
         )}
-        {messages.map((msg, i) => (
-          <div key={i} className={msg.role === "user" ? "flex justify-end" : "flex justify-start"}>
-            {msg.role === "user" ? (
-              <div className="max-w-[80%] rounded-2xl rounded-br-md border border-slate-800 bg-slate-800 px-4 py-3 text-sm text-white shadow-sm">
-                {msg.content}
+
+        {dedupedMessages.map((msg, i) => {
+          if (msg.role === "user") {
+            return (
+              <div key={i} className="flex justify-end">
+                <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-slate-800 px-4 py-3 text-sm text-white shadow-sm">
+                  {msg.content}
+                </div>
               </div>
-            ) : (
-              <div className="max-w-[92%] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-700 shadow-sm">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Coach</p>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}
+            );
+          }
+
+          // Error state — show as inline alert, not a bubble
+          if (msg._isError) {
+            return (
+              <div key={i} className="flex justify-start">
+                <div className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-sm text-red-600">
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>Something went wrong — please try again.</span>
+                </div>
+              </div>
+            );
+          }
+
+          // Normal coach message
+          return (
+            <div key={i} className="flex justify-start">
+              <div className="max-w-[90%] rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-4 py-3.5 text-sm leading-relaxed text-slate-700 shadow-sm">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
                   components={{
                     p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
                     strong: ({ children }) => <strong className="font-semibold text-slate-900">{children}</strong>,
                     ul: ({ children }) => <ul className="mb-2 pl-4 space-y-0.5 list-disc">{children}</ul>,
+                    ol: ({ children }) => <ol className="mb-2 pl-4 space-y-0.5 list-decimal">{children}</ol>,
                     li: ({ children }) => <li className="text-slate-600">{children}</li>,
-                    blockquote: ({ children }) => <blockquote className="border-l-2 border-amber-400 pl-3 italic text-slate-500 my-2">{children}</blockquote>,
-                    code: ({ children }) => <code className="rounded bg-slate-100 px-1 py-0.5 text-xs font-mono text-amber-700">{children}</code>,
+                    h3: ({ children }) => <h3 className="mt-3 mb-1 font-semibold text-slate-800">{children}</h3>,
+                    blockquote: ({ children }) => (
+                      <blockquote className="border-l-2 border-amber-400 pl-3 italic text-slate-500 my-2">{children}</blockquote>
+                    ),
+                    code: ({ children }) => (
+                      <code className="rounded bg-slate-100 px-1 py-0.5 text-xs font-mono text-amber-700">{children}</code>
+                    ),
                   }}
                 >
                   {stripProtocol(msg.content)}
                 </ReactMarkdown>
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
+
         {isStreaming && (
-          <div className="flex items-center gap-2 px-1 py-2 text-xs text-slate-400">
-            <span className="font-medium">Coach is typing</span>
-            {[0,1,2].map(i => (
-              <span key={i} className="h-1.5 w-1.5 rounded-full bg-slate-300 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-            ))}
+          <div className="flex justify-start">
+            <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-slate-100 bg-white px-4 py-3 shadow-sm">
+              {[0, 1, 2].map(i => (
+                <span
+                  key={i}
+                  className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-bounce"
+                  style={{ animationDelay: `${i * 0.15}s` }}
+                />
+              ))}
+            </div>
           </div>
         )}
-        <div ref={el => { if (el) el.scrollIntoView({ behavior: "smooth" }); }} />
+
+        <div ref={bottomRef} />
       </div>
 
-      <div className="border-t border-slate-200 px-4 py-4 space-y-3">
-        <div className="flex flex-wrap gap-2">
+      {/* Input area */}
+      <div className="border-t border-slate-200 bg-white px-4 py-3 space-y-2.5">
+        {/* Quick chips */}
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
           {quickPrompts.map(prompt => (
             <button
               key={prompt}
               onClick={() => !isStreaming && onSend(prompt)}
               disabled={isStreaming}
-              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-40"
+              className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-600 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-40"
             >
               {prompt}
             </button>
           ))}
         </div>
-        <div className="flex items-end gap-3">
+
+        <div className="flex items-end gap-2.5">
           <textarea
+            ref={textareaRef}
             value={input}
-            onChange={e => { setInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px"; }}
-            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (input.trim() && !isStreaming) { onSend(input.trim()); setInput(""); } } }}
+            onChange={e => {
+              setInput(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+            }}
+            onKeyDown={e => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
             placeholder="Message your coach..."
             rows={1}
             disabled={isStreaming}
-            className="flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+            className="flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-400 disabled:opacity-60"
           />
           <button
             disabled={!input.trim() || isStreaming}
-            onClick={() => { if (input.trim() && !isStreaming) { onSend(input.trim()); setInput(""); } }}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-white transition hover:bg-slate-700 disabled:opacity-30"
+            onClick={handleSend}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-white transition hover:bg-slate-700 disabled:opacity-30"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
             </svg>
           </button>
         </div>
+        <p className="text-center text-[10px] text-slate-400">Enter to send · Shift+Enter for new line</p>
       </div>
     </div>
   );
@@ -530,25 +681,29 @@ export default function ThemeB() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // ── Upload screen ──────────────────────────────────────────────────────────
   if (!session.resumeText) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-slate-50">
-        <div className="w-full max-w-2xl px-8">
+        <div className="w-full max-w-xl px-6">
           <div className="mb-8 text-center">
             <div className="mb-2 flex items-center justify-center gap-2">
               <span className="h-2 w-2 rounded-full bg-amber-500" />
               <h1 className="text-2xl font-bold text-slate-800">IB Resume Coach</h1>
             </div>
-            <p className="text-sm text-slate-500">Professional coaching for IB recruiting — with real edits, not generic AI noise.</p>
+            <p className="text-sm text-slate-500">
+              Professional coaching for IB recruiting — real edits, not generic AI noise.
+            </p>
           </div>
-          <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
+
+          <div className="grid gap-4 md:grid-cols-[1.3fr_0.7fr]">
             <label className="flex cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-slate-200 bg-white px-8 py-12 shadow-sm transition hover:border-amber-400 hover:shadow-md">
               {isUploading ? (
                 <>
                   <div className="h-9 w-9 animate-spin rounded-full border-2 border-slate-200 border-t-amber-500" />
                   <div className="text-center">
                     <p className="text-sm font-semibold text-slate-700">Parsing your resume...</p>
-                    <p className="mt-1 text-xs text-slate-400">This usually takes a few seconds</p>
+                    <p className="mt-1 text-xs text-slate-400">Usually takes a few seconds</p>
                   </div>
                 </>
               ) : (
@@ -562,7 +717,11 @@ export default function ThemeB() {
                   </div>
                 </>
               )}
-              <input type="file" accept=".pdf,.doc,.docx" className="hidden" disabled={isUploading}
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx"
+                className="hidden"
+                disabled={isUploading}
                 onChange={async e => {
                   const file = e.target.files?.[0];
                   if (!file) return;
@@ -582,22 +741,36 @@ export default function ThemeB() {
                 }}
               />
             </label>
+
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">What happens next</p>
-              <ol className="mt-3 space-y-2 text-sm text-slate-600">
-                <li><span className="font-semibold text-slate-800">1.</span> We score your resume across 5 IB metrics.</li>
-                <li><span className="font-semibold text-slate-800">2.</span> Click any bullet to generate better variants.</li>
-                <li><span className="font-semibold text-slate-800">3.</span> Apply edits instantly and export your pack.</li>
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">What happens next</p>
+              <ol className="mt-3 space-y-3 text-sm text-slate-600">
+                <li className="flex gap-2.5">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[11px] font-bold text-amber-700">1</span>
+                  <span>Score across 5 IB-specific metrics</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[11px] font-bold text-amber-700">2</span>
+                  <span>Click any bullet to get better variants</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[11px] font-bold text-amber-700">3</span>
+                  <span>Export resume + story + networking plan</span>
+                </li>
               </ol>
-              <p className="mt-4 text-xs text-slate-400">Your resume stays local to this browser session.</p>
+              <p className="mt-4 text-[11px] text-slate-400">Session stays local to your browser.</p>
             </div>
           </div>
-          {uploadError && <p className="mt-3 text-center text-sm text-red-500">{uploadError}</p>}
+
+          {uploadError && (
+            <p className="mt-3 text-center text-sm text-red-500">{uploadError}</p>
+          )}
         </div>
       </div>
     );
   }
 
+  // ── Intake form ────────────────────────────────────────────────────────────
   if (session.showIntakeForm) {
     return (
       <div className="flex h-full w-full bg-slate-50">
@@ -608,10 +781,12 @@ export default function ThemeB() {
     );
   }
 
+  // ── Main 3-column layout ───────────────────────────────────────────────────
   return (
-    <main className="flex h-full w-full overflow-hidden bg-slate-50">
-      {/* Left: Resume (always visible) */}
-      <div className="hidden w-[38%] shrink-0 flex-col overflow-hidden border-r border-slate-200 md:flex">
+    <main className="flex h-full w-full overflow-hidden bg-slate-100">
+
+      {/* Left: Resume (always visible on md+) */}
+      <div className="hidden w-[36%] shrink-0 flex-col overflow-hidden border-r border-slate-200 md:flex">
         <ResumePanelB
           resumeText={session.currentResumeText}
           updateCount={session.updateCount}
@@ -630,27 +805,21 @@ export default function ThemeB() {
           onSend={session.handleSend}
           mode={session.mode}
           candidateProfile={session.candidateProfile}
+          resumeScore={session.resumeScore}
         />
       </div>
 
-      {/* Right: Score panel (always visible) */}
+      {/* Right: Score panel (always visible on md+) */}
       <div className="hidden md:flex">
         <ScorePanelB
           score={session.resumeScore}
           scoreHistory={session.scoreHistory}
           onAction={session.handleAction}
           isStreaming={session.isStreaming}
+          onExport={() => setShowExport(true)}
+          currentResumeText={session.currentResumeText}
+          onNewSession={session.handleNewSession}
         />
-      </div>
-
-      {/* Export button — top-right corner of score panel */}
-      <div className="absolute bottom-4 right-4">
-        <button
-          onClick={() => setShowExport(true)}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
-        >
-          Export Pack ↓
-        </button>
       </div>
 
       {showExport && (

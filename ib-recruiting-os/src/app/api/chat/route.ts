@@ -1,18 +1,22 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
 import { SYSTEM_PROMPT } from "@/lib/systemPrompt";
 
+const client = new OpenAI({
+  apiKey: process.env.DEEPSEEK_API_KEY,
+  baseURL: "https://api.deepseek.com",
+});
+
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.DEEPSEEK_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "Missing ANTHROPIC_API_KEY" },
+        { error: "Missing DEEPSEEK_API_KEY" },
         { status: 500 }
       );
     }
 
-    const client = new Anthropic({ apiKey });
     const { messages, resumeText, mode, candidateProfile, isFirstMessage } =
       await req.json();
 
@@ -27,7 +31,7 @@ export async function POST(req: NextRequest) {
       profileContext +
       `\n\n## Candidate's resume\n\`\`\`\n${resumeText}\n\`\`\``;
 
-    const anthropicMessages = isFirstMessage
+    const chatMessages = isFirstMessage
       ? [
           {
             role: "user" as const,
@@ -40,11 +44,14 @@ export async function POST(req: NextRequest) {
           content: m.content,
         }));
 
-    const stream = await client.messages.stream({
-      model: "claude-sonnet-4-6",
+    const stream = await client.chat.completions.create({
+      model: "deepseek-chat",
       max_tokens: 1024,
-      system: systemWithContext,
-      messages: anthropicMessages,
+      messages: [
+        { role: "system", content: systemWithContext },
+        ...chatMessages,
+      ],
+      stream: true,
     });
 
     const encoder = new TextEncoder();
@@ -52,22 +59,25 @@ export async function POST(req: NextRequest) {
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const event of stream) {
-            if (
-              event.type === "content_block_delta" &&
-              event.delta.type === "text_delta"
-            ) {
-              const data = JSON.stringify({ delta: { text: event.delta.text } });
+          for await (const chunk of stream) {
+            const text = chunk.choices[0]?.delta?.content ?? "";
+            if (text) {
+              const data = JSON.stringify({ delta: { text } });
               controller.enqueue(encoder.encode(`data: ${data}\n\n`));
             }
           }
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch (streamErr) {
-          console.error("Stream error:", streamErr);
-          const errData = JSON.stringify({ error: "Stream failed" });
-          controller.enqueue(encoder.encode(`data: ${errData}\n\n`));
-          controller.close();
+          const msg = streamErr instanceof Error ? streamErr.message : String(streamErr);
+          if (!/aborted|closed|cancel/i.test(msg)) {
+            console.error("/api/chat stream error:", streamErr);
+          }
+          try {
+            controller.close();
+          } catch {
+            // noop
+          }
         }
       },
     });

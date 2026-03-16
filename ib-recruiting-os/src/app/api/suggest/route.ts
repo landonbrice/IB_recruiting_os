@@ -64,37 +64,58 @@ export async function POST(req: NextRequest) {
     maxTokens = 1024;
   }
 
-  const stream = await client.chat.completions.create({
-    model: "deepseek-chat",
-    max_tokens: maxTokens,
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: userMessage },
-    ],
-    stream: true,
-  });
+  try {
+    const stream = await client.chat.completions.create({
+      model: "deepseek-chat",
+      max_tokens: maxTokens,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userMessage },
+      ],
+      stream: true,
+    });
 
-  const encoder = new TextEncoder();
+    const encoder = new TextEncoder();
 
-  const readable = new ReadableStream({
-    async start(controller) {
-      for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content ?? "";
-        if (text) {
-          const data = JSON.stringify({ delta: { text } });
-          controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of stream) {
+            const text = chunk.choices[0]?.delta?.content ?? "";
+            if (text) {
+              const data = JSON.stringify({ delta: { text } });
+              controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+            }
+          }
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        } catch (err) {
+          // Most common: client disconnected mid-stream; avoid noisy failures.
+          const msg = err instanceof Error ? err.message : String(err);
+          if (!/aborted|closed|cancel/i.test(msg)) {
+            console.error("/api/suggest stream error:", err);
+          }
+          try {
+            controller.close();
+          } catch {
+            // noop
+          }
         }
-      }
-      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-      controller.close();
-    },
-  });
+      },
+    });
 
-  return new Response(readable, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+    return new Response(readable, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (err) {
+    console.error("/api/suggest error:", err);
+    return new Response(JSON.stringify({ error: "Suggest request failed" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 }

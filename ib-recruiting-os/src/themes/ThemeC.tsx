@@ -23,6 +23,7 @@ import ExportModal from "@/components/ExportModal";
 import BulletModal from "@/components/BulletModal";
 import { useCoachSession } from "@/hooks/useCoachSession";
 import type { ResumeScore, Message, CandidateProfile } from "@/lib/types";
+import { enrichResumeLines } from "@/lib/resumeStructure";
 
 const GREEN = "#00ff9d";
 const DIM = "#4a4a4a";
@@ -113,48 +114,24 @@ function TermResume({ resumeText, candidateProfile, onApplyBullet }: TermResumeP
   type SelectedBulletData = { text: string; section: string; company: string; roleTitle: string; bulletIndex: number };
   const [selected, setSelected] = useState<SelectedBulletData | null>(null);
 
-  // Parse lines for clickable bullets
-  const lines = resumeText.split("\n");
-  let currentCompany = "", currentSection = "", currentRoleTitle = "";
-  let bulletIdx = 0, lastWasBullet = false;
-
-  interface ParsedLine { raw: string; isBullet: boolean; company: string; roleTitle: string; section: string; bulletIndex: number; }
-  const parsed: ParsedLine[] = lines.map(line => {
-    const t = line.trim();
-    if (!t) { lastWasBullet = false; return { raw: line, isBullet: false, company: "", roleTitle: "", section: "", bulletIndex: -1 }; }
-    const isHeader = t.length < 60 && (t === t.toUpperCase() || /^(Education|Experience|Skills|Activities|Leadership|Projects)/i.test(t));
-    if (isHeader) { currentSection = t; currentCompany = ""; currentRoleTitle = ""; bulletIdx = 0; lastWasBullet = false; return { raw: line, isBullet: false, company: "", roleTitle: "", section: t, bulletIndex: -1 }; }
-    if (/^[▪•\-·]/.test(t)) {
-      if (!lastWasBullet) bulletIdx = 0;
-      const pl = { raw: line, isBullet: true, company: currentCompany, roleTitle: currentRoleTitle, section: currentSection, bulletIndex: bulletIdx };
-      bulletIdx++; lastWasBullet = true;
-      return pl;
-    }
-    if (!lastWasBullet) {
-      if (!currentCompany) { currentCompany = t; bulletIdx = 0; }
-      else if (!currentRoleTitle) { currentRoleTitle = t; }
-      else { currentCompany = t; currentRoleTitle = ""; bulletIdx = 0; }
-    }
-    lastWasBullet = false;
-    return { raw: line, isBullet: false, company: "", roleTitle: "", section: "", bulletIndex: -1 };
-  });
+  const parsed = enrichResumeLines(resumeText);
 
   return (
     <div className="h-full overflow-y-auto p-4">
       <pre className="font-mono text-[10px] leading-snug text-stone-400 whitespace-pre-wrap">
-        {parsed.map((pl, i) => pl.isBullet && pl.company ? (
+        {parsed.map((pl, i) => pl.type === "bullet" && pl.company ? (
           <span
             key={i}
-            onClick={() => setSelected({ text: pl.raw.trim(), section: pl.section, company: pl.company, roleTitle: pl.roleTitle, bulletIndex: pl.bulletIndex })}
+            onClick={() => setSelected({ text: pl.text.trim(), section: pl.section, company: pl.company, roleTitle: pl.roleTitle, bulletIndex: pl.bulletIndex })}
             className="cursor-pointer block transition-colors"
             style={{ color: "#6b7280" }}
             onMouseEnter={e => (e.currentTarget.style.color = GREEN)}
             onMouseLeave={e => (e.currentTarget.style.color = "#6b7280")}
           >
-            {pl.raw + "\n"}
+            {pl.text + "\n"}
           </span>
         ) : (
-          <span key={i}>{pl.raw + "\n"}</span>
+          <span key={i}>{pl.text + "\n"}</span>
         ))}
       </pre>
       {selected && (

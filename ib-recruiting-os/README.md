@@ -1,39 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# IB Recruiting OS (IB Resume Coach)
 
-## Getting Started
+AI coaching app for investment-banking recruiting.
 
-First, run the development server:
+## What it does
+- Resume upload + parsing (`PDF`, `DOC`, `DOCX`)
+- Interactive coaching chat (streaming)
+- Click-to-rewrite bullets with confidence/risk metadata
+- Resume scoring across 5 IB-specific categories
+- Session persistence (local storage) + export pack
+- Multiple UI themes (`a`, `b`, `c`) with Theme B default
 
+## Stack
+- Next.js App Router
+- React + TypeScript
+- Tailwind CSS
+- DeepSeek Chat API via OpenAI SDK-compatible client
+
+## Key routes
+- `GET /` landing + upload
+- `GET /app` coaching surface
+- `POST /api/parse-resume`
+- `POST /api/chat`
+- `POST /api/suggest`
+- `POST /api/beta-auth`
+
+## Setup
 ```bash
+npm install
+cp .env.example .env.local
+# set DEEPSEEK_API_KEY in .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000][def] with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment
+Required:
+- `DEEPSEEK_API_KEY`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Optional:
+- `NEXT_PUBLIC_UI_VERSION` (`a` | `b` | `c`, default `b`)
 
-## Learn More
+## Theme switching
+- Runtime (dev): `/app?ui=a|b|c`
+- Env default: `NEXT_PUBLIC_UI_VERSION=b`
 
-To learn more about Next.js, take a look at the following resources:
+## Architecture notes
+- Session state lives in `src/hooks/useCoachSession.ts`
+- Shared SSE stream parser: `src/lib/sse.ts`
+- Shared resume structure parser: `src/lib/resumeStructure.ts`
+- Protocol parsing: `src/lib/protocolParser.ts`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-
-[def]: http://localhost:3000
+## Quality gates
+- `npm run build` must pass
+- Manual smoke test:
+  1. Upload resume
+  2. Complete intake
+  3. Send chat prompt
+  4. Rewrite + apply one bullet
+  5. Re-score
+  6. Export pack
