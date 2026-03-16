@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Message, CandidateProfile } from "@/lib/types";
+import { CHAT_QUICK_PROMPTS } from "@/lib/coachActions";
 
 interface ChatPanelProps {
   messages: Message[];
@@ -40,12 +41,7 @@ const MODE_LABELS: Record<string, string> = {
   feasibility: "Feasibility",
 };
 
-const QUICK_PROMPTS = [
-  "Score my resume",
-  "Rewrite my weakest bullet",
-  "Help me tighten my Why IB story",
-  "Give me this week’s networking plan",
-];
+const QUICK_PROMPTS = CHAT_QUICK_PROMPTS;
 
 const ERROR_MSG = "Something went wrong. Please try again.";
 

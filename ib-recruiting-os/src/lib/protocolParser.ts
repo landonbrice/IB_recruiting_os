@@ -63,20 +63,59 @@ export function validateResumeUpdate(u: unknown): u is ResumeUpdate {
 export function validateResumeScore(s: unknown): s is ResumeScore {
   if (!s || typeof s !== "object") return false;
   const obj = s as Record<string, unknown>;
+
+  const categories = obj.categories;
+  const categoriesOk =
+    Array.isArray(categories) &&
+    categories.length === 5 &&
+    categories.every((c) => {
+      if (!c || typeof c !== "object") return false;
+      const cc = c as Record<string, unknown>;
+      return (
+        typeof cc.name === "string" &&
+        typeof cc.weight === "number" &&
+        typeof cc.score === "number" &&
+        typeof cc.weighted === "number"
+      );
+    });
+
+  const listOfStrings = (v: unknown) =>
+    Array.isArray(v) && v.every((x) => typeof x === "string");
+
   return (
     typeof obj.total === "number" &&
-    Array.isArray(obj.categories) &&
-    Array.isArray(obj.working) &&
-    Array.isArray(obj.hurting) &&
+    categoriesOk &&
+    listOfStrings(obj.working) &&
+    listOfStrings(obj.hurting) &&
     typeof obj.nextStep === "string"
   );
 }
+
+const SCHOOL_TIERS = new Set(["target", "semi-target", "non-target"]);
+const STAGES = new Set(["freshman", "sophomore", "junior", "senior", "mba", "career-switcher"]);
+const BANK_TIERS = new Set(["bulge-bracket", "elite-boutique", "middle-market", "regional"]);
+const NETWORKING = new Set(["cold", "some-contact", "internal-champion"]);
 
 /** Validate that an unknown value is a partial CandidateProfile. */
 export function validateProfileUpdate(
   p: unknown
 ): p is Partial<CandidateProfile> {
-  return !!p && typeof p === "object" && !Array.isArray(p);
+  if (!p || typeof p !== "object" || Array.isArray(p)) return false;
+  const obj = p as Record<string, unknown>;
+
+  const stringOpt = (v: unknown) => v === undefined || typeof v === "string";
+
+  if (!stringOpt(obj.background)) return false;
+  if (!stringOpt(obj.experienceLevel)) return false;
+  if (!stringOpt(obj.targetGroup)) return false;
+  if (!stringOpt(obj.targetBank)) return false;
+
+  if (obj.schoolTier !== undefined && !SCHOOL_TIERS.has(String(obj.schoolTier))) return false;
+  if (obj.stage !== undefined && !STAGES.has(String(obj.stage))) return false;
+  if (obj.targetBankTier !== undefined && !BANK_TIERS.has(String(obj.targetBankTier))) return false;
+  if (obj.networkingPosture !== undefined && !NETWORKING.has(String(obj.networkingPosture))) return false;
+
+  return true;
 }
 
 // ── Convenience typed parsers ───────────────────────────────────────────────

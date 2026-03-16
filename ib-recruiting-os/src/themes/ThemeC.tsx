@@ -24,6 +24,7 @@ import BulletModal from "@/components/BulletModal";
 import { useCoachSession } from "@/hooks/useCoachSession";
 import type { ResumeScore, Message, CandidateProfile } from "@/lib/types";
 import { enrichResumeLines } from "@/lib/resumeStructure";
+import { CORE_COACH_ACTIONS } from "@/lib/coachActions";
 
 const GREEN = "#00ff9d";
 const DIM = "#4a4a4a";
@@ -251,23 +252,17 @@ export default function ThemeC() {
         {/* Commands */}
         <div className="flex-1 px-3 py-3 space-y-1.5">
           <p className="mb-2 text-[10px]" style={{ color: DIM }}>{"// commands"}</p>
-          {[
-            [":score", "Score my resume"],
-            [":verbs", "Scan my resume for weak verbs and suggest replacements"],
-            [":story", "Let's develop my Why-IB story — ask me one question at a time"],
-            [":cover", "Generate a cover letter based on everything we've discussed"],
-            [":network", "Give me a concrete networking action plan for this week"],
-          ].map(([cmd, action]) => (
+          {CORE_COACH_ACTIONS.map((action) => (
             <button
-              key={cmd}
-              onClick={() => session.handleAction(action)}
+              key={action.key}
+              onClick={() => session.handleAction(action.prompt)}
               disabled={session.isStreaming}
               className="block w-full text-left text-[11px] transition disabled:opacity-30"
               style={{ color: DIM }}
               onMouseEnter={e => (e.currentTarget.style.color = GREEN)}
               onMouseLeave={e => (e.currentTarget.style.color = DIM)}
             >
-              {cmd}
+              {action.terminalCmd ?? action.label}
             </button>
           ))}
         </div>
