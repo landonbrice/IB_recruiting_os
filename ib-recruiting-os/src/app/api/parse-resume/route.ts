@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
+  const contentType = req.headers.get("content-type") || "";
+  if (!contentType.toLowerCase().includes("multipart/form-data")) {
+    return NextResponse.json(
+      { error: "Expected multipart/form-data with a file field named 'file'." },
+      { status: 400 }
+    );
+  }
+
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
 
