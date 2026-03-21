@@ -1,116 +1,112 @@
 # IB Recruiting OS — Current State
 
-> **Status note (2026-03-10):** This file is historical context from early build stage. Current implementation state is tracked in `../LOUIS_BUILD_LOG.md` and `CHANGELOG-2026-03-10-ux-pass.md`.
+_Last updated: 2026-03-21 (post lint/smoke hardening + repo tidy)_
 
-_Last updated: 2026-03-04 19:06 CST_
+## Product Status
+**✅ Functional and stable for active beta iteration**
 
-## Project goal (assimilated)
-Build an AI-powered IB recruiting coach that does more than generic resume editing:
-1. Diagnoses candidate profile + recruiting context
-2. Rewrites resume bullets for IB signal strength (without fabrication)
-3. Develops personal story / "Why IB" narrative
-4. Gives realistic feasibility + leverage guidance (networking-first)
-5. Feels like an operator/co-pilot, not a passive chatbot
-
-This can be monetized as a recruiting copilot for undergrads and career switchers targeting IB internships/full-time roles.
-
----
-
-## What exists now (strong foundation)
-- **Solid frontend workflow** (Next.js):
-  - Upload resume → intake form → streamed coaching chat
-  - Action sidebar for score + focused actions
-  - Resume panel with inline bullet-click editing UX
-- **State model is good**:
-  - Structured `CandidateProfile`
-  - Chat mode transitions (`diagnostic`, `editing`, `story`, `targeting`, `feasibility`)
-  - Structured hidden protocol blocks (`resume-update`, `resume-score`, `profile-update`)
-- **Prompt quality is strong** (`src/lib/systemPrompt.ts`):
-  - Clear voice/stance
-  - Explicit behavioral constraints
-  - Explicit scoring schema
-  - Networking truth baked in
-
-Net: product direction is clear and differentiated already.
+Core loop works end-to-end:
+1. Upload resume (PDF/DOC/DOCX)
+2. Parse resume text/html
+3. Intake capture
+4. Streaming coaching chat
+5. Click-to-rewrite bullets with confidence/risk metadata
+6. Apply rewrite to resume state
+7. Re-score resume
+8. Export pack
 
 ---
 
-## Critical gaps discovered
+## What is currently implemented
 
-### 1) Missing backend API routes (blocking runtime)
-Frontend calls:
+### Frontend experience
+- Landing page with upload flow and beta gate support
+- `/app` coaching workspace with 3 UI themes:
+  - Theme A (operator/dark)
+  - Theme B (platform/dashboard default)
+  - Theme C (terminal)
+- App loading state for first route load (`src/app/app/loading.tsx`)
+- Chat panel quick prompts, streaming indicator, and cleaner error handling
+- Resume panel with clickable bullets and rewrite modal
+- Score display + history tracking
+
+### Backend/API routes
 - `POST /api/parse-resume`
+  - Parses PDF + Word docs
+  - Returns normalized text (+ html for docx path)
+  - Handles invalid file types safely
 - `POST /api/chat`
+  - Streams coach responses
+  - Handles disconnect/abort more gracefully
+- `POST /api/suggest`
+  - Question phase + rewrite generation phase
+  - Structured rewrite output format (`BULLET`, `CONFIDENCE`, `RISK`)
+- `POST /api/beta-auth`
+  - Invite code gate logic
 
-But in current tree there is no `src/app/api/...` implementation present. That means app UX can render, but core functionality won’t work end-to-end without those routes.
+### State and protocol
+- Session engine: `src/hooks/useCoachSession.ts`
+- Protocol parsing: `src/lib/protocolParser.ts`
+  - stricter resume-score + profile enum validation added
+- Structured output parsing for:
+  - `resume-update`
+  - `resume-score`
+  - `profile-update`
+  - `story-output`
+  - `networking-actions`
 
-### 2) Reliability risk from regex-only protocol parsing
-Current extraction of `resume-update`, `resume-score`, `profile-update` is regex over freeform model output. This is fine for prototyping, but brittle in production (single malformed block can silently degrade behavior).
-
-### 3) No explicit persistence/session strategy
-Current state appears in-memory on client session. For a paid coaching product, you’ll likely want:
-- user session identity
-- saved resumes/iterations
-- progress timeline (score deltas, top recurring weaknesses)
-
-### 4) Trust & safety/product integrity not yet hardened
-Prompt says “no fabrication,” but there is no explicit backend validator that checks edited bullets for plausibility/risk patterns before displaying as “approved.”
-
-### 5) Positioning/packaging layer not yet represented in code
-Product can be sold, but current app reads more as tool than program. Missing package anchors (e.g., “7-day interview-ready sprint”, “weekly checkpoint”, etc.) that convert better.
-
----
-
-## Product reasoning (where this wins)
-Your wedge is not just “resume scoring.” It’s:
-- **Brutally honest but useful coaching**
-- **Resume + narrative + targeting + feasibility in one loop**
-- **Networking leverage orientation** (rare in resume tools)
-
-If reliability is tightened and onboarding value is made obvious in first 5 minutes, this can be a paid niche product quickly.
+### Recent architecture cleanup completed
+- Shared SSE parser added: `src/lib/sse.ts`
+- Shared resume structure parser added: `src/lib/resumeStructure.ts`
+- Shared coach actions/prompts config added: `src/lib/coachActions.ts`
+- Theme/config warning fixed in Next config (`turbopack.root`)
+- README replaced from boilerplate with project-specific doc
 
 ---
 
-## Recommended next steps (priority order)
+## Validation snapshot
 
-### P0 — Make it actually production-usable
-1. Implement `src/app/api/chat/route.ts` with streaming Anthropic responses.
-2. Implement `src/app/api/parse-resume/route.ts` for PDF/DOCX extraction.
-3. Add hard error surfacing in UI for backend failures (instead of generic fallback).
+### Build + quality gates
+- `npm run build` passes cleanly.
+- Lint command path has been updated for current Next.js/ESLint flow and now runs as a usable gate.
+- Local smoke checks were added and verified against core routes.
 
-### P1 — Hardening + data integrity
-4. Add protocol block validation utility:
-   - strict JSON parse + schema checks
-   - tolerate malformed model output gracefully
-5. Add bullet safety checks (basic plausibility guardrails).
-6. Add simple event logging (mode shifts, score changes, applied edits).
-
-### P2 — Monetization readiness
-7. Create a “guided outcomes” layer:
-   - session objective
-   - top 3 fixes
-   - done criteria before mock interviews
-8. Add export pack:
-   - final resume
-   - why-IB story draft
-   - networking action list (next 7 days)
-
-### P3 — Growth loop
-9. Add before/after score delta snapshot share card.
-10. Add candidate segment-specific onboarding templates (non-target, career switcher, etc.).
+### QA checks completed (latest pass)
+- Chat stream checks: **5/5 pass**
+- Suggest structured output checks: **5/5 pass**
+- Parse invalid type check: **pass** (`400`)
+- Parse non-multipart request now safely returns **`400`** (hardening patch)
+- Theme routes:
+  - `/app?ui=a` → `200`
+  - `/app?ui=b` → `200`
+  - `/app?ui=c` → `200`
+- Chat first-token latency (sample):
+  - min/avg/max ≈ **1.38s / 1.47s / 1.54s**
 
 ---
 
-## Immediate tactical plan (next work session)
-- Build missing API routes first (chat + parse-resume)
-- Run one end-to-end pass with a real resume file
-- Fix parser edge cases found in that pass
-- Then tune onboarding copy for clearer paid value proposition
+## Known limitations / remaining work
+
+### P0 (before broad public rollout)
+- Run full manual UX matrix across all themes:
+  - bullet click/apply consistency
+  - rewrite modal behavior under errors
+  - export pack content completeness
+- Add explicit UI surfacing for feasibility protocol block (card/component)
+
+### P1 (quality hardening)
+- Expand IB exemplar set significantly (current set remains limited)
+- Add plausibility/fabrication guardrail before applying rewrites
+- Improve scoring consistency/stability across repeated runs
+
+### P2 (productization)
+- Mobile tabbed layout polish for sub-768 viewport
+- Better session rail/progress UX consistency across themes
+- Analytics/event instrumentation for drop-off and usage insights
 
 ---
 
-## Definition of "ready for paid beta"
-- End-to-end flow works without manual intervention
-- Resume scoring + bullet updates are stable across 10+ test resumes
-- Output quality feels materially better than generic ChatGPT prompting
-- User leaves with concrete artifacts: improved resume + story + next networking actions
+## Operational note
+Current branch is on `main` and suitable for continued testing iteration. Next best step is targeted functional hardening + UX consistency pass, not a full rebuild.
+
+Project docs were also intentionally tidied in this pass (legacy planning/changelog docs removed), with `current_state.md` retained as the canonical status snapshot.
