@@ -1,6 +1,6 @@
 "use client";
 
-import { spinePoint } from "./spine";
+import { spinePoint, VB_W, VB_H } from "./spine";
 import type { ArcNodeDisplay } from "./demoData";
 import { DEMO_THREADS } from "./demoData";
 
@@ -11,9 +11,7 @@ interface ArcNodeProps {
   onClick: () => void;
 }
 
-// SVG viewBox is 720x560 — convert to percentages
-const VB_W = 720;
-const VB_H = 560;
+// Convert spine coordinates to container percentages
 
 export default function ArcNode({
   node,
@@ -69,6 +67,7 @@ export default function ArcNode({
 
   return (
     <div
+      data-arc-node
       onClick={onClick}
       className="absolute cursor-pointer"
       style={{
@@ -111,7 +110,7 @@ export default function ArcNode({
         </div>
 
         <div
-          className="mt-0.5 truncate text-[#78716c]"
+          className="mt-0.5 leading-tight text-[#78716c]"
           style={{ fontSize: isSide ? 9 : 10 }}
         >
           {node.sub} · {node.timeframe}

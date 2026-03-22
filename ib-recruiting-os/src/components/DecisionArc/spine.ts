@@ -1,6 +1,10 @@
+// Shared viewBox dimensions — used by SpineSVG and ArcNode
+export const VB_W = 720;
+export const VB_H = 560;
+
 export function spinePoint(t: number): { x: number; y: number } {
-  const padX = 60, padY = 60;
-  const canvasW = 600, canvasH = 440;
+  const padX = 60, padY = 90;
+  const canvasW = 600, canvasH = 380;
   const x = padX + t * canvasW;
   const progress = 1 - Math.pow(1 - t, 2.2);
   const y = padY + canvasH * (1 - progress);

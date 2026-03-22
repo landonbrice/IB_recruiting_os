@@ -1,6 +1,6 @@
 "use client";
 
-import { spinePoint, spinePath } from "./spine";
+import { spinePoint, spinePath, VB_W, VB_H } from "./spine";
 import { DEMO_NODES, DEMO_THREADS, type ArcNodeDisplay } from "./demoData";
 import type { Thread } from "@/lib/storyState";
 
@@ -69,8 +69,8 @@ export default function SpineSVG({ overlayOpen, highlightedThreadId }: SpineSVGP
     <svg
       className="absolute inset-0 h-full w-full"
       style={{ zIndex: 1 }}
-      viewBox="0 0 720 560"
-      preserveAspectRatio="xMidYMid meet"
+      viewBox={`0 0 ${VB_W} ${VB_H}`}
+      preserveAspectRatio="none"
     >
       {/* Spine — smoke stroke */}
       <path
@@ -140,7 +140,7 @@ export default function SpineSVG({ overlayOpen, highlightedThreadId }: SpineSVGP
 
         const mid = spinePoint((prev.t + node.t) / 2);
         const lines = splitText(node.transition, 24);
-        const yBase = mid.y - 18;
+        const yBase = mid.y - 35;
 
         return (
           <g key={`trans-${node.id}`}>
