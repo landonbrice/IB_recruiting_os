@@ -1,12 +1,7 @@
-import OpenAI from "openai";
 import { NextRequest } from "next/server";
 import type { CandidateProfile } from "@/lib/types";
 import { getExemplarContext } from "@/lib/ibExemplars";
-
-const client = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: "https://api.deepseek.com",
-});
+import { streamChatCompletion } from "@/lib/llm";
 
 interface SuggestRequest {
   bullet: string;
@@ -65,14 +60,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const stream = await client.chat.completions.create({
-      model: "deepseek-chat",
-      max_tokens: maxTokens,
+    const stream = await streamChatCompletion({
       messages: [
         { role: "system", content: system },
         { role: "user", content: userMessage },
       ],
-      stream: true,
+      maxTokens,
     });
 
     const encoder = new TextEncoder();
@@ -80,17 +73,13 @@ export async function POST(req: NextRequest) {
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of stream) {
-            const text = chunk.choices[0]?.delta?.content ?? "";
-            if (text) {
-              const data = JSON.stringify({ delta: { text } });
-              controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-            }
+          for await (const text of stream) {
+            const data = JSON.stringify({ delta: { text } });
+            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
           }
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch (err) {
-          // Most common: client disconnected mid-stream; avoid noisy failures.
           const msg = err instanceof Error ? err.message : String(err);
           if (!/aborted|closed|cancel/i.test(msg)) {
             console.error("/api/suggest stream error:", err);

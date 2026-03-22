@@ -1,18 +1,14 @@
-import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
-import { SYSTEM_PROMPT } from "@/lib/systemPrompt";
-
-const client = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: "https://api.deepseek.com",
-});
+import { SYSTEM_PROMPT, getBankContext } from "@/lib/systemPrompt";
+import { streamChatCompletion, getProviderInfo } from "@/lib/llm";
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-    if (!apiKey) {
+    const { provider } = getProviderInfo();
+    const keyVar = provider === "anthropic" ? "ANTHROPIC_API_KEY" : "DEEPSEEK_API_KEY";
+    if (!process.env[keyVar]) {
       return NextResponse.json(
-        { error: "Missing DEEPSEEK_API_KEY" },
+        { error: `Missing ${keyVar}` },
         { status: 500 }
       );
     }
@@ -25,10 +21,13 @@ export async function POST(req: NextRequest) {
         ? `\n\n## Current candidate profile\n${JSON.stringify(candidateProfile, null, 2)}`
         : "";
 
+    const bankContext = getBankContext(candidateProfile?.targetBank);
+
     const systemWithContext =
       SYSTEM_PROMPT +
       `\n\n## Current mode: ${mode}` +
       profileContext +
+      bankContext +
       `\n\n## Candidate's resume\n\`\`\`\n${resumeText}\n\`\`\``;
 
     const chatMessages = isFirstMessage
@@ -44,14 +43,12 @@ export async function POST(req: NextRequest) {
           content: m.content,
         }));
 
-    const stream = await client.chat.completions.create({
-      model: "deepseek-chat",
-      max_tokens: 1024,
+    const stream = await streamChatCompletion({
       messages: [
         { role: "system", content: systemWithContext },
         ...chatMessages,
       ],
-      stream: true,
+      maxTokens: 1024,
     });
 
     const encoder = new TextEncoder();
@@ -59,12 +56,9 @@ export async function POST(req: NextRequest) {
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of stream) {
-            const text = chunk.choices[0]?.delta?.content ?? "";
-            if (text) {
-              const data = JSON.stringify({ delta: { text } });
-              controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-            }
+          for await (const text of stream) {
+            const data = JSON.stringify({ delta: { text } });
+            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
           }
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();

@@ -1,3 +1,27 @@
+import { findBankProfile, isPlaceholder } from "./bankProfiles";
+
+/**
+ * Build optional bank-specific context for the system prompt.
+ * Returns empty string if no target bank is set or profile is placeholder-only.
+ */
+export function getBankContext(targetBank?: string): string {
+  if (!targetBank) return "";
+  const profile = findBankProfile(targetBank);
+  if (!profile) return "";
+
+  const parts: string[] = [`## Target Bank Context: ${profile.name}`, `Tier: ${profile.tier}`, `Known for: ${profile.knownFor.join(", ")}`];
+
+  if (!isPlaceholder(profile.culture)) parts.push(`Culture: ${profile.culture}`);
+  if (!isPlaceholder(profile.whatTheyLookFor)) parts.push(`What they look for: ${profile.whatTheyLookFor}`);
+  if (!isPlaceholder(profile.interviewStyle)) parts.push(`Interview style: ${profile.interviewStyle}`);
+  if (!isPlaceholder(profile.resumeEmphasis)) parts.push(`Resume emphasis: ${profile.resumeEmphasis}`);
+  if (!isPlaceholder(profile.networkingTips)) parts.push(`Networking: ${profile.networkingTips}`);
+
+  // Only return if we have more than just the header + tier + knownFor
+  if (parts.length <= 3) return `\n\n${parts.join("\n")}`;
+  return `\n\n${parts.join("\n")}`;
+}
+
 export const SYSTEM_PROMPT = `You are a sharp, direct IB recruiting coach — think of yourself as a 2nd-year analyst at an elite boutique who's reviewing a candidate's resume over coffee. You have an agenda and you drive the conversation. You are never sycophantic.
 
 ## Your Core Belief

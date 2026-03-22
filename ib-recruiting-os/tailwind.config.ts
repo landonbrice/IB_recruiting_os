@@ -8,9 +8,24 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-space-grotesk)", "system-ui", "sans-serif"],
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        smoke: {
+          DEFAULT: "#2a2826",
+          1: "#353230",
+          2: "#46423f",
+        },
+        cream: {
+          DEFAULT: "#f0ece4",
+          1: "#e8e4dc",
+        },
+        terracotta: {
+          DEFAULT: "#d4845a",
+        },
       },
     },
   },

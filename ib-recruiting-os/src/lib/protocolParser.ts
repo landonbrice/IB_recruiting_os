@@ -8,7 +8,7 @@
  * cover-letter, feasibility-score
  */
 
-import type { ResumeUpdate, ResumeScore, CandidateProfile } from "./types";
+import type { ResumeUpdate, ResumeScore, CandidateProfile, FeasibilityScore } from "./types";
 
 // ── Generic block extraction ────────────────────────────────────────────────
 
@@ -163,6 +163,27 @@ export function parseNetworkingActions(
   content: string
 ): { actions: string[]; template?: string } | null {
   return parseBlock<{ actions: string[]; template?: string }>(content, "networking-actions");
+}
+
+/** Validate that an unknown value conforms to FeasibilityScore. */
+export function validateFeasibilityScore(s: unknown): s is FeasibilityScore {
+  if (!s || typeof s !== "object") return false;
+  const obj = s as Record<string, unknown>;
+  const listOfStrings = (v: unknown) =>
+    Array.isArray(v) && v.every((x) => typeof x === "string");
+  return (
+    typeof obj.score === "number" &&
+    typeof obj.assessment === "string" &&
+    typeof obj.biggestLeverage === "string" &&
+    listOfStrings(obj.controllables) &&
+    listOfStrings(obj.uncontrollables)
+  );
+}
+
+/** Parse a feasibility-score block, returning null if missing or invalid. */
+export function parseFeasibilityScore(content: string): FeasibilityScore | null {
+  const raw = parseBlock<unknown>(content, "feasibility-score");
+  return raw && validateFeasibilityScore(raw) ? raw : null;
 }
 
 /** Detect mode shift signals from assistant content. */

@@ -12,6 +12,7 @@ import {
   parseResumeScore,
   parseProfileUpdate,
   parseResumeUpdates,
+  parseFeasibilityScore,
   detectMode,
 } from "@/lib/protocolParser";
 import { consumeSSE } from "@/lib/sse";
@@ -22,6 +23,7 @@ import type {
   CandidateProfile,
   ResumeUpdate,
   ResumeScore,
+  FeasibilityScore,
 } from "@/lib/types";
 
 // ── Persistence ──────────────────────────────────────────────────────────────
@@ -50,6 +52,7 @@ interface PersistedSession {
   resumeText: string | null;
   currentResumeText: string | null;
   resumeScore: ResumeScore | null;
+  feasibilityScore?: FeasibilityScore | null;
   mode: ChatMode;
   updateCount: number;
   fileName: string | null;
@@ -146,6 +149,7 @@ export function useCoachSession() {
   const [mode, setMode] = useState<ChatMode>("diagnostic");
   const [candidateProfile, setCandidateProfile] = useState<CandidateProfile>({});
   const [resumeScore, setResumeScore] = useState<ResumeScore | null>(null);
+  const [feasibilityScore, setFeasibilityScore] = useState<FeasibilityScore | null>(null);
   const [scoreHistory, setScoreHistory] = useState<ScoreHistoryPoint[]>([]);
   const [rewriteHistory, setRewriteHistory] = useState<RewriteEvent[]>([]);
   const [showIntakeForm, setShowIntakeForm] = useState(false);
@@ -189,6 +193,7 @@ export function useCoachSession() {
       setMessages(saved.messages);
       setCandidateProfile(saved.candidateProfile);
       setResumeScore(saved.resumeScore);
+      setFeasibilityScore(saved.feasibilityScore ?? null);
       setMode(saved.mode);
       setUpdateCount(saved.updateCount);
       setRewriteHistory(saved.rewriteHistory ?? []);
@@ -203,12 +208,12 @@ export function useCoachSession() {
     if (!isRestoredRef.current || !resumeText) return;
     const t = setTimeout(() => saveSession({
       messages, candidateProfile, resumeText, currentResumeText,
-      resumeScore, mode, updateCount, fileName, resumeHtml,
+      resumeScore, feasibilityScore, mode, updateCount, fileName, resumeHtml,
       rewriteHistory, scoreHistory,
     }), 500);
     return () => clearTimeout(t);
   }, [messages, candidateProfile, resumeText, currentResumeText,
-      resumeScore, mode, updateCount, fileName, resumeHtml, rewriteHistory, scoreHistory]);
+      resumeScore, feasibilityScore, mode, updateCount, fileName, resumeHtml, rewriteHistory, scoreHistory]);
 
   // ── Upload ──────────────────────────────────────────────────────────────
   const handleUpload = useCallback((text: string, name: string, file: File, html?: string) => {
@@ -226,7 +231,7 @@ export function useCoachSession() {
     try { localStorage.removeItem(LS_KEY); } catch {/* */}
     setResumeText(null); setCurrentResumeText(null); setFileName(null);
     setResumeFile(null); setResumeHtml(null); setMessages([]);
-    setCandidateProfile({}); setResumeScore(null);
+    setCandidateProfile({}); setResumeScore(null); setFeasibilityScore(null);
     setScoreHistory([]); setRewriteHistory([]);
     setMode("diagnostic"); setUpdateCount(0); setShowIntakeForm(false);
     logEvent("session_reset", {});
@@ -286,6 +291,11 @@ export function useCoachSession() {
           if (prev[prev.length - 1]?.total === scoreUpdate!.total) return prev;
           return [...prev, { total: scoreUpdate!.total, createdAt: Date.now() }].slice(-20);
         });
+      }
+
+      const feasUpdate = parseFeasibilityScore(assistantContent);
+      if (feasUpdate) {
+        setFeasibilityScore(feasUpdate);
       }
 
       const updates = parseResumeUpdates(assistantContent);
@@ -382,7 +392,7 @@ export function useCoachSession() {
     // State
     resumeText, currentResumeText, resumeFile, resumeHtml, fileName,
     updateCount, messages: visibleMessages, isStreaming, mode,
-    candidateProfile, resumeScore, scoreHistory, rewriteHistory, showIntakeForm, showResumePanel,
+    candidateProfile, resumeScore, feasibilityScore, scoreHistory, rewriteHistory, showIntakeForm, showResumePanel,
     // Actions
     handleUpload, handleNewSession, handleIntakeSubmit,
     handleAction, handleSend, handleApplyBullet, handleRequestScore,

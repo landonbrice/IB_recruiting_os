@@ -1,26 +1,21 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "IB Resume Coach — Built for Banking",
+  title: "IB Recruiting OS — Built for Banking",
   description:
-    "An AI-powered IB recruiting coach that scores your resume, rewrites bullets live, develops your story, and tells you honestly where you stand — including whether networking matters more than another rewrite.",
+    "An AI-powered IB recruiting OS that reverse-engineers your Decision Arc, builds behavioral stories, and prepares you for investment banking interviews.",
   openGraph: {
-    title: "IB Resume Coach",
+    title: "IB Recruiting OS",
     description:
-      "The IB resume coach that's brutally honest. Drop your resume, get scored, get coached.",
+      "The candidate-building OS for investment banking recruiting.",
     type: "website",
   },
 };
@@ -33,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-stone-950 text-stone-100`}
+        className={`${spaceGrotesk.variable} font-sans antialiased bg-stone-950 text-stone-100`}
       >
         {children}
       </body>

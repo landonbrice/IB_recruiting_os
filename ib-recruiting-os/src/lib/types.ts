@@ -45,3 +45,11 @@ export interface ResumeScore {
   hurting: string[];
   nextStep: string;
 }
+
+export interface FeasibilityScore {
+  score: number;
+  assessment: string;
+  biggestLeverage: string;
+  controllables: string[];
+  uncontrollables: string[];
+}

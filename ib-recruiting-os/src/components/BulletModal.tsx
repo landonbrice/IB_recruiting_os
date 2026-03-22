@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { CandidateProfile } from "@/lib/types";
 import { consumeSSE } from "@/lib/sse";
+import { checkPlausibility } from "@/lib/plausibilityCheck";
 
 export interface SelectedBullet {
   text: string;
@@ -282,41 +283,72 @@ export default function BulletModal({
 
             {variants.length > 0 ? (
               <div className="space-y-2">
-                {variants.map((v, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-stone-800 rounded-lg px-4 py-3 flex items-start justify-between gap-3"
-                  >
-                    <div className="flex-1">
-                      <p className="text-sm text-stone-200 leading-snug">{v.text}</p>
-                      <p className="mt-1 text-[11px] text-stone-400">{explainVariant(bullet.text, v.text)}</p>
-                      <div className="mt-2 flex items-center gap-2 text-[10px]">
-                        {v.confidence && (
-                          <span className={`rounded-full px-2 py-0.5 ${
-                            v.confidence === "High" ? "bg-emerald-900/40 text-emerald-300" :
-                            v.confidence === "Medium" ? "bg-amber-900/40 text-amber-300" : "bg-red-900/40 text-red-300"
-                          }`}>
-                            Confidence: {v.confidence}
-                          </span>
-                        )}
-                        {v.risk && (
-                          <span className={`rounded-full px-2 py-0.5 ${
-                            v.risk === "Low" ? "bg-emerald-900/30 text-emerald-200" :
-                            v.risk === "Medium" ? "bg-amber-900/30 text-amber-200" : "bg-red-900/30 text-red-200"
-                          }`}>
-                            Risk: {v.risk}
-                          </span>
+                {variants.map((v, idx) => {
+                  const plausibility = checkPlausibility(bullet.text, v.text, bullet.roleTitle, candidateProfile);
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-stone-800 rounded-lg px-4 py-3 flex items-start justify-between gap-3"
+                    >
+                      <div className="flex-1">
+                        <p className="text-sm text-stone-200 leading-snug">{v.text}</p>
+                        <p className="mt-1 text-[11px] text-stone-400">{explainVariant(bullet.text, v.text)}</p>
+                        <div className="mt-2 flex items-center gap-2 text-[10px]">
+                          {v.confidence && (
+                            <span className={`rounded-full px-2 py-0.5 ${
+                              v.confidence === "High" ? "bg-emerald-900/40 text-emerald-300" :
+                              v.confidence === "Medium" ? "bg-amber-900/40 text-amber-300" : "bg-red-900/40 text-red-300"
+                            }`}>
+                              Confidence: {v.confidence}
+                            </span>
+                          )}
+                          {v.risk && (
+                            <span className={`rounded-full px-2 py-0.5 ${
+                              v.risk === "Low" ? "bg-emerald-900/30 text-emerald-200" :
+                              v.risk === "Medium" ? "bg-amber-900/30 text-amber-200" : "bg-red-900/30 text-red-200"
+                            }`}>
+                              Risk: {v.risk}
+                            </span>
+                          )}
+                          {plausibility.riskLevel === "safe" && (
+                            <span className="rounded-full px-2 py-0.5 bg-emerald-900/30 text-emerald-300">
+                              ✓ Plausible
+                            </span>
+                          )}
+                          {plausibility.riskLevel === "caution" && (
+                            <span className="rounded-full px-2 py-0.5 bg-amber-900/30 text-amber-200">
+                              ⚠ Caution
+                            </span>
+                          )}
+                          {plausibility.riskLevel === "flag" && (
+                            <span className="rounded-full px-2 py-0.5 bg-red-900/30 text-red-200">
+                              ⚑ Flagged
+                            </span>
+                          )}
+                        </div>
+                        {plausibility.warnings.length > 0 && (
+                          <div className="mt-1.5 space-y-0.5">
+                            {plausibility.warnings.map((w, wi) => (
+                              <p key={wi} className={`text-[10px] ${plausibility.riskLevel === "flag" ? "text-red-300" : "text-amber-300/80"}`}>
+                                {w}
+                              </p>
+                            ))}
+                          </div>
                         )}
                       </div>
+                      <button
+                        onClick={() => handleApply(v)}
+                        className={`flex-shrink-0 text-xs font-medium transition whitespace-nowrap ${
+                          plausibility.riskLevel === "flag"
+                            ? "text-amber-500 hover:text-amber-400"
+                            : "text-amber-400 hover:text-amber-300"
+                        }`}
+                      >
+                        {plausibility.riskLevel === "flag" ? "Apply Anyway" : "Use"}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleApply(v)}
-                      className="flex-shrink-0 text-xs text-amber-400 hover:text-amber-300 font-medium transition whitespace-nowrap"
-                    >
-                      Use
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : phase === "generating" && streamText ? (
               // Live partial stream before bullets parse

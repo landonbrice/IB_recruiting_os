@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { ResumeScore, Message } from "@/lib/types";
+import type { ResumeScore, FeasibilityScore, Message } from "@/lib/types";
+import FeasibilityCard from "@/components/FeasibilityCard";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface ActionSidebarProps {
   resumeScore: ResumeScore | null;
+  feasibilityScore?: FeasibilityScore | null;
   resumeText: string | null;
   currentResumeText: string | null;
   isStreaming: boolean;
@@ -86,6 +88,7 @@ function getReadinessSignal(
 
 export default function ActionSidebar({
   resumeScore,
+  feasibilityScore,
   currentResumeText,
   isStreaming,
   mode,
@@ -284,6 +287,13 @@ export default function ActionSidebar({
           />
         </div>
       </div>
+
+      {/* ── Feasibility Score ────────────────────────────────────────── */}
+      {(feasibilityScore || resumeScore) && (
+        <div className="border-b border-stone-800">
+          <FeasibilityCard feasibilityScore={feasibilityScore ?? null} />
+        </div>
+      )}
 
       {/* Spacer */}
       <div className="flex-1" />
