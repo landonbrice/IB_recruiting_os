@@ -10,9 +10,9 @@ const RADIUS = 52;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 function gaugeColor(score: number): string {
-  if (score >= 80) return "#8b5cf6"; // violet-500
-  if (score >= 60) return "#6366f1"; // indigo-500
-  return "#a855f7"; // purple-500
+  if (score >= 80) return "#d4845a"; // terracotta
+  if (score >= 60) return "#d4845a"; // terracotta
+  return "#d97706"; // amber — needs attention
 }
 
 function label(score: number): string {

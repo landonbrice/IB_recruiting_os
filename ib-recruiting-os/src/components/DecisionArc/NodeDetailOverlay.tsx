@@ -66,27 +66,27 @@ export default function NodeDetailOverlay({
         {(node.positives.length > 0 || node.negatives.length > 0) && (
           <div className="mb-6 grid grid-cols-2 gap-6">
             <div>
-              <h3 className="mb-2 text-[9px] font-semibold uppercase tracking-wider text-green-600">
+              <h3 className="mb-2 text-[9px] font-semibold uppercase tracking-wider text-[#44403c]">
                 Qualities Gained
               </h3>
               <div className="space-y-1.5">
                 {node.positives.map((p, i) => (
                   <div key={i} className="flex gap-1.5 text-[12px] leading-relaxed">
-                    <span className="flex-shrink-0 text-green-500">+</span>
-                    <span className="text-smoke">{p}</span>
+                    <span className="flex-shrink-0 text-terracotta">+</span>
+                    <span className="text-[#44403c]">{p}</span>
                   </div>
                 ))}
               </div>
             </div>
             <div>
-              <h3 className="mb-2 text-[9px] font-semibold uppercase tracking-wider text-red-500">
+              <h3 className="mb-2 text-[9px] font-semibold uppercase tracking-wider text-[#78716c]">
                 What Pushed Me On
               </h3>
               <div className="space-y-1.5">
                 {node.negatives.map((n, i) => (
                   <div key={i} className="flex gap-1.5 text-[12px] leading-relaxed">
-                    <span className="flex-shrink-0 text-red-500">−</span>
-                    <span className="text-smoke">{n}</span>
+                    <span className="flex-shrink-0 text-[#a8a29e]">−</span>
+                    <span className="text-[#78716c]">{n}</span>
                   </div>
                 ))}
               </div>

@@ -3,10 +3,10 @@
 import type { ImpactStory } from "@/lib/storyState";
 
 const STAGES = [
-  { key: "answerFirst" as const, label: "ANSWER FIRST", num: "\u2460", color: "#d4845a" },
-  { key: "actions" as const, label: "ACTIONS", num: "\u2461", color: "#6366f1" },
-  { key: "tension" as const, label: "TENSION", num: "\u2462", color: "#dc2626" },
-  { key: "resolution" as const, label: "RESOLUTION", num: "\u2463", color: "#059669" },
+  { key: "answerFirst" as const, label: "ANSWER FIRST", num: "\u2460", color: "#d4845a", borderColor: "#d4845a" },
+  { key: "actions" as const, label: "ACTIONS", num: "\u2461", color: "#78716c", borderColor: "#a8a29e" },
+  { key: "tension" as const, label: "TENSION", num: "\u2462", color: "#78716c", borderColor: "#a8a29e" },
+  { key: "resolution" as const, label: "RESOLUTION", num: "\u2463", color: "#78716c", borderColor: "#a8a29e" },
 ];
 
 interface SteppingStoneVisualProps {
@@ -58,13 +58,13 @@ export default function SteppingStoneVisual({ steppingStone }: SteppingStoneVisu
                 filled
                   ? {
                       backgroundColor: "white",
-                      borderLeft: `3px solid ${stage.color}`,
+                      borderLeft: `2.5px solid ${stage.borderColor}`,
                       borderTop: "0.5px solid #e8e4dc",
                       borderRight: "0.5px solid #e8e4dc",
                       borderBottom: "0.5px solid #e8e4dc",
                     }
                   : {
-                      backgroundColor: "#f0ece4",
+                      backgroundColor: "#F5F1EA",
                       border: "1.5px dashed #e8e4dc",
                     }
               }

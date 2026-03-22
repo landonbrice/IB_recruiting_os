@@ -3,10 +3,10 @@
 import type { ImpactStory } from "@/lib/storyState";
 
 const STAGES = [
-  { key: "answerFirst" as const, label: "Answer First", num: "①", color: "#d4845a" },
-  { key: "actions" as const, label: "Actions", num: "②", color: "#6366f1" },
-  { key: "tension" as const, label: "Tension", num: "③", color: "#dc2626" },
-  { key: "resolution" as const, label: "Resolution", num: "④", color: "#059669" },
+  { key: "answerFirst" as const, label: "Answer First", num: "①", color: "#d4845a", borderColor: "#d4845a" },
+  { key: "actions" as const, label: "Actions", num: "②", color: "#78716c", borderColor: "#a8a29e" },
+  { key: "tension" as const, label: "Tension", num: "③", color: "#78716c", borderColor: "#a8a29e" },
+  { key: "resolution" as const, label: "Resolution", num: "④", color: "#78716c", borderColor: "#a8a29e" },
 ];
 
 interface SteppingStoneExpandedProps {
@@ -41,9 +41,10 @@ export default function SteppingStoneExpanded({
             <div
               className={`rounded-lg px-3 py-2 ${
                 filled
-                  ? "border border-cream-1 bg-white"
+                  ? "bg-white"
                   : "border border-dashed border-cream-1 bg-cream/50"
               }`}
+              style={filled ? { borderLeft: `2.5px solid ${stage.borderColor}`, borderTop: "0.5px solid #e8e4dc", borderRight: "0.5px solid #e8e4dc", borderBottom: "0.5px solid #e8e4dc" } : undefined}
             >
               {filled ? (
                 <p className="text-[12px] leading-relaxed text-smoke">{content}</p>

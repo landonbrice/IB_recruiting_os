@@ -13,12 +13,12 @@ const IMPACT_LABELS: Record<ImpactStory["type"], string> = {
 };
 
 const IMPACT_COLORS: Record<ImpactStory["type"], string> = {
-  I: "#8B5CF6",
+  I: "#d4845a",
   M: "#d4845a",
-  P: "#EC4899",
-  A: "#6366f1",
-  C: "#dc2626",
-  T: "#059669",
+  P: "#d4845a",
+  A: "#d4845a",
+  C: "#d4845a",
+  T: "#d4845a",
 };
 
 const CATEGORIES: ImpactStory["type"][] = ["I", "M", "P", "A", "C", "T"];

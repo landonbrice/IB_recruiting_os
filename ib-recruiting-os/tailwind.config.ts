@@ -20,7 +20,7 @@ const config: Config = {
           2: "#46423f",
         },
         cream: {
-          DEFAULT: "#f0ece4",
+          DEFAULT: "#F5F1EA",
           1: "#e8e4dc",
         },
         terracotta: {
