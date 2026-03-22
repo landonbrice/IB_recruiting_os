@@ -23,7 +23,7 @@ export default function BottomBar({ activeTab }: BottomBarProps) {
         {actions.map((label) => (
           <button
             key={label}
-            className="rounded-[5px] border border-white/[0.08] bg-transparent px-2.5 py-1 text-[10px] text-cream/35 transition-all duration-150 hover:border-white/[0.12] hover:text-cream/50"
+            className="rounded-[5px] border border-white/[0.12] bg-transparent px-2.5 py-1 text-[10px] text-cream/50 transition-all duration-150 hover:border-white/[0.18] hover:text-cream/70"
           >
             {label}
           </button>

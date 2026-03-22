@@ -3,7 +3,6 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { ArcNode as ArcNodeData } from "@/lib/storyState";
 import type { Thread } from "@/lib/storyState";
-import ImpactBadge from "./ImpactBadge";
 
 export type ArcNodeFlowData = {
   arcNode: ArcNodeData;
@@ -17,81 +16,71 @@ export default function ArcNode({ data, selected }: NodeProps) {
   const isGoal = arcNode.type === "goal";
 
   const nodeThreads = threads.filter((t) => t.nodeIds.includes(arcNode.id));
+  const storyCount = arcNode.impactStories.length;
 
   return (
     <>
       <Handle type="target" position={Position.Left} className="!bg-cream-1 !border-cream-1 !w-2 !h-2" />
       <div
-        className={`w-[200px] rounded-[10px] bg-white p-3 transition-all duration-150 ${
-          isNonResume ? "border-[1.5px] border-dashed border-cream-1" : "border-[1.5px] border-cream-1"
-        } ${selected ? "!border-terracotta ring-2 ring-terracotta/30" : "hover:border-[#d4cfca]"} ${
-          isUpcoming ? "opacity-70" : ""
-        }`}
+        className={`w-[220px] rounded-[10px] bg-white p-[14px] transition-all duration-150 hover:scale-[1.02] ${
+          isNonResume
+            ? "border-[1.5px] border-dashed border-cream-1"
+            : isGoal
+              ? "border-[1.5px] border-amber-300/60"
+              : "border-[1.5px] border-cream-1"
+        } ${
+          selected
+            ? "!border-terracotta ring-2 ring-terracotta/20"
+            : "hover:border-[#d6d3d1]"
+        } ${isUpcoming ? "opacity-60" : ""}`}
       >
         {/* Type chips */}
         {isNonResume && (
           <div className="mb-1.5 flex justify-end">
-            <span className="rounded bg-cream px-1.5 py-0.5 text-[9px] font-semibold text-terracotta">
+            <span className="rounded bg-cream px-1 py-px text-[8px] font-semibold text-terracotta">
               OFF RESUME
             </span>
           </div>
         )}
         {isGoal && (
           <div className="mb-1.5 flex justify-end">
-            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-600">
+            <span className="rounded bg-amber-50 px-1 py-px text-[8px] font-semibold text-amber-600">
               TARGET
             </span>
           </div>
         )}
 
-        {/* Title */}
-        <div className="text-[12px] font-semibold leading-tight text-smoke">
+        {/* Label */}
+        <div className="text-[13px] font-semibold leading-tight text-smoke line-clamp-2">
           {arcNode.label}
         </div>
-        <div className="mt-0.5 text-[10px] text-[#78716c]">
+
+        {/* Subtitle */}
+        <div className="mt-0.5 truncate text-[10px] text-[#78716c]">
           {arcNode.sub} · {arcNode.timeframe}
         </div>
 
-        {/* Qualities preview */}
-        {(arcNode.positives.length > 0 || arcNode.negatives.length > 0) && (
-          <div className="mt-2 space-y-0.5">
-            {arcNode.positives.slice(0, 2).map((p, i) => (
-              <div key={i} className="flex gap-1 text-[10px] leading-tight">
-                <span className="flex-shrink-0 text-green-500">+</span>
-                <span className="text-[#78716c] line-clamp-1">{p}</span>
-              </div>
-            ))}
-            {arcNode.negatives.slice(0, 1).map((n, i) => (
-              <div key={i} className="flex gap-1 text-[10px] leading-tight">
-                <span className="flex-shrink-0 text-red-500">−</span>
-                <span className="text-[#78716c] line-clamp-1">{n}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Divider */}
+        <div className="my-2 border-t border-cream-1" />
 
-        {/* Story badges */}
-        {arcNode.impactStories.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {arcNode.impactStories.map((story) => (
-              <ImpactBadge key={story.id} type={story.type} size="sm" />
-            ))}
-          </div>
-        )}
-
-        {/* Thread indicators */}
-        {nodeThreads.length > 0 && (
-          <div className="mt-2 flex gap-1">
+        {/* Thread dots + story count */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
             {nodeThreads.map((t) => (
               <div
                 key={t.id}
-                className="h-[3px] w-4 rounded-full"
+                className="h-1.5 w-1.5 rounded-full"
                 style={{ backgroundColor: t.color }}
                 title={t.label}
               />
             ))}
           </div>
-        )}
+          {storyCount > 0 && (
+            <span className="text-[10px] text-[#a8a29e]">
+              {storyCount} {storyCount === 1 ? "story" : "stories"}
+            </span>
+          )}
+        </div>
       </div>
       <Handle type="source" position={Position.Right} className="!bg-cream-1 !border-cream-1 !w-2 !h-2" />
     </>
