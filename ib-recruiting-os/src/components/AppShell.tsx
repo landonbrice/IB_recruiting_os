@@ -4,6 +4,7 @@ import { useState } from "react";
 import NavBar, { type TabId } from "@/components/NavBar";
 import CoachPanel from "@/components/CoachPanel";
 import BottomBar from "@/components/BottomBar";
+import DecisionArc from "@/components/DecisionArc";
 
 const TAB_LABELS: Record<TabId, string> = {
   resume: "Resume",
@@ -13,13 +14,23 @@ const TAB_LABELS: Record<TabId, string> = {
   targets: "Targets",
 };
 
-const TAB_DESCRIPTIONS: Record<TabId, string> = {
+const TAB_DESCRIPTIONS: Partial<Record<TabId, string>> = {
   resume: "Coming soon",
-  arc: "Your Decision Arc will appear here. Upload a resume to generate a draft.",
   stories: "Your behavioral story arsenal. Develop stories through the Decision Arc first.",
   cover: "Coming soon",
   targets: "Coming soon",
 };
+
+function TabPlaceholder({ tab }: { tab: TabId }) {
+  return (
+    <div className="flex flex-1 items-center justify-center">
+      <div className="text-center">
+        <h2 className="text-lg font-semibold text-smoke">{TAB_LABELS[tab]}</h2>
+        <p className="mt-1 text-sm text-smoke/40">{TAB_DESCRIPTIONS[tab]}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>("arc");
@@ -31,13 +42,8 @@ export default function AppShell() {
       <div className="flex flex-1 overflow-hidden">
         {/* Cream Canvas */}
         <div className="flex-1 p-[10px]">
-          <div className="flex h-full flex-col overflow-auto rounded-[10px] bg-cream">
-            <div className="flex flex-1 items-center justify-center">
-              <div className="text-center">
-                <h2 className="text-lg font-semibold text-smoke">{TAB_LABELS[activeTab]}</h2>
-                <p className="mt-1 text-sm text-smoke/40">{TAB_DESCRIPTIONS[activeTab]}</p>
-              </div>
-            </div>
+          <div className="relative flex h-full flex-col overflow-auto rounded-[10px] bg-cream">
+            {activeTab === "arc" ? <DecisionArc /> : <TabPlaceholder tab={activeTab} />}
           </div>
         </div>
 
