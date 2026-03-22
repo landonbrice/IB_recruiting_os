@@ -1,12 +1,22 @@
 import type { ArcNode, Thread } from "@/lib/storyState";
 
-export const DEMO_NODES: ArcNode[] = [
+export interface ArcNodeDisplay extends ArcNode {
+  t: number;
+  offset?: { dx: number; dy: number };
+  branchFrom?: string;
+  transition?: string;
+  weight?: "heavy" | "normal";
+}
+
+export const DEMO_NODES: ArcNodeDisplay[] = [
   {
     id: "idp",
     label: "Innovation Diploma Program",
     sub: "Lead Consulting Analyst",
     timeframe: "2022–2024",
     type: "experience",
+    t: 0.0,
+    weight: "normal",
     positives: [
       "Learned to lead through purpose, not authority",
       "Discovered I need work to reach execution, not just recommendation",
@@ -74,6 +84,9 @@ export const DEMO_NODES: ArcNode[] = [
     sub: "Co-Founder",
     timeframe: "Summer 2024–Present",
     type: "experience",
+    t: 0.22,
+    weight: "normal",
+    transition: "wanted execution, not just ideas",
     positives: [
       "Builder by mind — needed autonomy and tangible outcomes",
       "Learned to read clients, negotiate, adapt on the fly",
@@ -112,11 +125,7 @@ export const DEMO_NODES: ArcNode[] = [
       },
     ],
     setMetGoals: [
-      {
-        set: "100 clients by end of summer",
-        met: "100+ clients",
-        metric: "$0 CAC",
-      },
+      { set: "100 clients by end of summer", met: "100+ clients", metric: "$0 CAC" },
     ],
   },
   {
@@ -125,14 +134,15 @@ export const DEMO_NODES: ArcNode[] = [
     sub: "Pitcher",
     timeframe: "Fall 2024–Present",
     type: "experience",
+    t: 0.22,
+    offset: { dx: 30, dy: 100 },
+    branchFrom: "amd",
     positives: [
       "Competitive intensity — won't lose; if outperformed, gets focused on process",
       "Discipline: 5:30 AM lifts, 30-40 hr/week forces ruthless prioritization",
       "Outspoken leadership — drives teammates toward immediate focus",
     ],
-    negatives: [
-      "Time constraint on everything else — forces efficiency",
-    ],
+    negatives: ["Time constraint on everything else — forces efficiency"],
     impactStories: [
       {
         id: "bb-1",
@@ -168,6 +178,9 @@ export const DEMO_NODES: ArcNode[] = [
     sub: "M&A Healthcare Intern",
     timeframe: "Summer 2025",
     type: "experience",
+    t: 0.52,
+    weight: "heavy",
+    transition: "needed scale + complex problems",
     positives: [
       "Discovered trust matters more than logic in deal origination",
       "Earned responsibility through incessant drive — asked for more when there was nothing",
@@ -232,11 +245,7 @@ export const DEMO_NODES: ArcNode[] = [
       },
     ],
     setMetGoals: [
-      {
-        set: "Source viable mandates",
-        met: "30+ qualified, 2 EOI",
-        metric: "2 expressions of interest",
-      },
+      { set: "Source viable mandates", met: "30+ qualified, 2 EOI", metric: "2 expressions of interest" },
     ],
   },
   {
@@ -245,6 +254,9 @@ export const DEMO_NODES: ArcNode[] = [
     sub: "Academic — not on resume",
     timeframe: "2025",
     type: "non-resume",
+    t: 0.52,
+    offset: { dx: 40, dy: 105 },
+    branchFrom: "krg",
     positives: [
       "Learned that presenting answers you don't have is wrong",
       "Developed discipline to sit confused longer before diving in",
@@ -287,6 +299,9 @@ export const DEMO_NODES: ArcNode[] = [
     sub: "PE Summer Analyst",
     timeframe: "Summer 2026",
     type: "upcoming",
+    t: 0.78,
+    weight: "normal",
+    transition: "deepening the thesis",
     positives: [
       "Private equity — deepening healthcare vertical",
       "Buy-side perspective after sell-side M&A",
@@ -301,6 +316,8 @@ export const DEMO_NODES: ArcNode[] = [
     sub: "Target",
     timeframe: "Goal",
     type: "goal",
+    t: 1.0,
+    transition: "convergence",
     positives: [],
     negatives: [],
     impactStories: [],
