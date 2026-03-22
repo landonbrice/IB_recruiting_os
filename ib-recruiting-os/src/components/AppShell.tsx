@@ -5,6 +5,7 @@ import NavBar, { type TabId } from "@/components/NavBar";
 import CoachPanel from "@/components/CoachPanel";
 import BottomBar from "@/components/BottomBar";
 import DecisionArc from "@/components/DecisionArc";
+import StoryBank from "@/components/StoryBank";
 
 const TAB_LABELS: Record<TabId, string> = {
   resume: "Resume",
@@ -16,7 +17,6 @@ const TAB_LABELS: Record<TabId, string> = {
 
 const TAB_DESCRIPTIONS: Partial<Record<TabId, string>> = {
   resume: "Coming soon",
-  stories: "Your behavioral story arsenal. Develop stories through the Decision Arc first.",
   cover: "Coming soon",
   targets: "Coming soon",
 };
@@ -43,7 +43,9 @@ export default function AppShell() {
         {/* Cream Canvas */}
         <div className="flex-1 p-[10px]">
           <div className="relative flex h-full flex-col overflow-auto rounded-[10px] bg-cream">
-            {activeTab === "arc" ? <DecisionArc /> : <TabPlaceholder tab={activeTab} />}
+            {activeTab === "arc" && <DecisionArc />}
+            {activeTab === "stories" && <StoryBank />}
+            {activeTab !== "arc" && activeTab !== "stories" && <TabPlaceholder tab={activeTab} />}
           </div>
         </div>
 
