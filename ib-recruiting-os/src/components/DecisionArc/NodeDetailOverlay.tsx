@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { Thread } from "@/lib/storyState";
-import type { ArcNodeDisplay } from "./demoData";
+import { useState } from "react";
+import type { ArcNode, Thread } from "@/lib/storyState";
 import ImpactBadge from "./ImpactBadge";
 import StatusBadge from "./StatusBadge";
 import ThreadBadge from "./ThreadBadge";
@@ -10,7 +9,7 @@ import SteppingStoneBar from "./SteppingStoneBar";
 import SteppingStoneExpanded from "./SteppingStoneExpanded";
 
 interface NodeDetailOverlayProps {
-  node: ArcNodeDisplay;
+  node: ArcNode;
   threads: Thread[];
   onClose: () => void;
 }
@@ -23,41 +22,16 @@ export default function NodeDetailOverlay({
   const [expandedStoryId, setExpandedStoryId] = useState<string | null>(null);
   const nodeThreads = threads.filter((t) => t.nodeIds.includes(node.id));
 
-  const isSide = !!node.branchFrom;
-  const isInflection = node.weight === "heavy";
-  const isNonResume = node.type === "non-resume";
-  const isGoal = node.type === "goal";
-
-  // Auto-expand first story
-  useEffect(() => {
-    if (node.impactStories.length > 0) {
-      setExpandedStoryId(node.impactStories[0].id);
-    } else {
-      setExpandedStoryId(null);
-    }
-  }, [node.id, node.impactStories]);
-
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center rounded-[10px]">
-      {/* Backdrop */}
+    <div className="absolute inset-0 z-20 flex rounded-[10px]">
+      {/* Blurred background click target */}
       <div
-        className="absolute inset-0 rounded-[10px]"
-        style={{
-          background: "rgba(240,236,228,0.88)",
-          backdropFilter: "blur(8px)",
-        }}
+        className="absolute inset-0 rounded-[10px] bg-cream/80 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Card */}
-      <div
-        className="relative z-10 w-full max-w-[560px] overflow-auto rounded-[14px] bg-white p-6"
-        style={{
-          maxHeight: "calc(100% - 48px)",
-          boxShadow: "0 12px 48px rgba(0,0,0,0.08)",
-          animation: "fadeUp 0.3s ease-out",
-        }}
-      >
+      {/* Overlay content */}
+      <div className="relative z-10 m-4 flex-1 overflow-auto rounded-[10px] bg-white p-6">
         {/* Back button */}
         <button
           onClick={onClose}
@@ -67,48 +41,30 @@ export default function NodeDetailOverlay({
         </button>
 
         {/* Header */}
-        <div className="mb-5">
+        <div className="mb-6">
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <h2 className="text-[16px] font-bold text-smoke">{node.label}</h2>
               <p className="mt-0.5 text-[12px] text-[#78716c]">
                 {node.sub} · {node.timeframe}
               </p>
-              {/* Transition phrase */}
-              {node.transition && (
-                <p className="mt-1.5 text-[11px] italic text-terracotta/70">
-                  &ldquo;{node.transition}&rdquo;
-                </p>
-              )}
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {isInflection && (
-                <span className="rounded-[4px] bg-terracotta/10 px-2 py-0.5 text-[8px] font-semibold uppercase text-terracotta">
-                  inflection point
-                </span>
-              )}
-              {isSide && isNonResume && (
-                <span className="rounded-[4px] bg-terracotta/10 px-2 py-0.5 text-[8px] font-semibold uppercase text-terracotta">
-                  off resume
-                </span>
-              )}
-              {isSide && !isNonResume && (
-                <span className="rounded-[4px] bg-red-50 px-2 py-0.5 text-[8px] font-semibold uppercase text-red-500">
-                  parallel force
-                </span>
-              )}
-              {isGoal && (
-                <span className="rounded-[4px] bg-amber-50 px-2 py-0.5 text-[8px] font-semibold uppercase text-amber-600">
-                  target
-                </span>
-              )}
-            </div>
+            {node.type === "non-resume" && (
+              <span className="rounded bg-cream px-2 py-0.5 text-[9px] font-semibold text-terracotta">
+                OFF RESUME
+              </span>
+            )}
+            {node.type === "goal" && (
+              <span className="rounded bg-amber-50 px-2 py-0.5 text-[9px] font-semibold text-amber-600">
+                TARGET
+              </span>
+            )}
           </div>
         </div>
 
         {/* Qualities */}
         {(node.positives.length > 0 || node.negatives.length > 0) && (
-          <div className="mb-5 grid grid-cols-2 gap-6">
+          <div className="mb-6 grid grid-cols-2 gap-6">
             <div>
               <h3 className="mb-2 text-[9px] font-semibold uppercase tracking-wider text-green-600">
                 Qualities Gained
@@ -140,7 +96,7 @@ export default function NodeDetailOverlay({
 
         {/* Threads */}
         {nodeThreads.length > 0 && (
-          <div className="mb-5">
+          <div className="mb-6">
             <h3 className="mb-2 text-[9px] font-semibold uppercase tracking-wider text-smoke/40">
               Threads
             </h3>
@@ -153,7 +109,7 @@ export default function NodeDetailOverlay({
         )}
 
         {/* Stories */}
-        <div>
+        <div className="mb-6">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-[9px] font-semibold uppercase tracking-wider text-smoke/40">
               IMPACT Stories
@@ -170,13 +126,13 @@ export default function NodeDetailOverlay({
               </p>
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {node.impactStories.map((story) => {
                 const isExpanded = expandedStoryId === story.id;
                 return (
                   <div
                     key={story.id}
-                    className="rounded-[10px] border-[0.5px] border-cream-1 bg-white"
+                    className="rounded-[10px] border border-cream-1 bg-white transition-all duration-150"
                   >
                     <button
                       onClick={() =>
@@ -211,19 +167,6 @@ export default function NodeDetailOverlay({
           )}
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes fadeUp {
-          from {
-            opacity: 0;
-            transform: translateY(14px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </div>
   );
 }

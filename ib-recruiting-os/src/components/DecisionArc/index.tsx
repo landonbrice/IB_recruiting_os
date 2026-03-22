@@ -1,151 +1,113 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { VB_W, VB_H } from "./spine";
-import SpineSVG from "./SpineSVG";
-import ArcNode from "./ArcNode";
+import { useCallback, useMemo, useState } from "react";
+import {
+  ReactFlow,
+  Background,
+  type Node,
+  type Edge,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+
+import ArcNodeComponent from "./ArcNode";
+import ThreadEdge from "./ThreadEdge";
 import ThreadLegend from "./ThreadLegend";
 import NodeDetailOverlay from "./NodeDetailOverlay";
 import { DEMO_NODES, DEMO_THREADS } from "./demoData";
 
-function clamp(v: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, v));
+// ── Layout — ascending arc, bottom-left to upper-right ──────────────────────
+
+const NODE_POSITIONS: Record<string, { x: number; y: number }> = {
+  idp:      { x: 0,    y: 500 },
+  amd:      { x: 280,  y: 380 },
+  baseball: { x: 500,  y: 420 },
+  krg:      { x: 720,  y: 260 },
+  macro:    { x: 850,  y: 350 },
+  cimarron: { x: 1050, y: 140 },
+  future:   { x: 1250, y: 50  },
+};
+
+// ── Node & Edge types ───────────────────────────────────────────────────────
+
+const nodeTypes = { arcNode: ArcNodeComponent };
+const edgeTypes = { threadEdge: ThreadEdge };
+
+// ── Build React Flow data ───────────────────────────────────────────────────
+
+function buildNodes(): Node[] {
+  return DEMO_NODES.map((n) => ({
+    id: n.id,
+    type: "arcNode",
+    position: NODE_POSITIONS[n.id] ?? { x: 0, y: 0 },
+    data: { arcNode: n, threads: DEMO_THREADS },
+    draggable: true,
+  }));
 }
+
+function buildEdges(hoveredThreadId: string | null): Edge[] {
+  const edges: Edge[] = [];
+  for (const thread of DEMO_THREADS) {
+    for (let i = 0; i < thread.nodeIds.length - 1; i++) {
+      const highlighted = hoveredThreadId === thread.id;
+      const dimmed = hoveredThreadId !== null && hoveredThreadId !== thread.id;
+      edges.push({
+        id: `${thread.id}-${thread.nodeIds[i]}-${thread.nodeIds[i + 1]}`,
+        source: thread.nodeIds[i],
+        target: thread.nodeIds[i + 1],
+        type: "threadEdge",
+        data: { color: thread.color, highlighted, dimmed },
+        animated: false,
+      });
+    }
+  }
+  return edges;
+}
+
+// ── Component ───────────────────────────────────────────────────────────────
 
 export default function DecisionArc() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [highlightedThreadId, setHighlightedThreadId] = useState<string | null>(null);
+  const [hoveredThreadId, setHoveredThreadId] = useState<string | null>(null);
 
-  // Zoom / pan
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-  const dragDist = useRef(0);
+  const nodes = useMemo(buildNodes, []);
+  const edges = useMemo(() => buildEdges(hoveredThreadId), [hoveredThreadId]);
 
   const selectedNode = selectedNodeId
     ? DEMO_NODES.find((n) => n.id === selectedNodeId) ?? null
     : null;
 
-  const onNodeClick = useCallback(
-    (nodeId: string) => {
-      // Suppress click if user was dragging
-      if (dragDist.current > 5) return;
-      setSelectedNodeId(nodeId);
-    },
-    []
-  );
-
-  // Wheel → zoom
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    setZoom((z) => clamp(z + e.deltaY * -0.002, 0.5, 2.5));
-  }, []);
-
-  // Mouse → pan
-  const onMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      // Don't pan if clicking a node or overlay
-      if ((e.target as HTMLElement).closest("[data-arc-node]") || selectedNodeId) return;
-      setIsPanning(true);
-      dragDist.current = 0;
-      panStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
-    },
-    [pan, selectedNodeId]
-  );
-
-  const onMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!isPanning) return;
-      const dx = e.clientX - panStart.current.x;
-      const dy = e.clientY - panStart.current.y;
-      dragDist.current = Math.sqrt(dx * dx + dy * dy);
-      setPan({
-        x: panStart.current.panX + dx,
-        y: panStart.current.panY + dy,
-      });
-    },
-    [isPanning]
-  );
-
-  const onMouseUp = useCallback(() => {
-    setIsPanning(false);
-  }, []);
-
-  const resetView = useCallback(() => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
+  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+    setSelectedNodeId(node.id);
   }, []);
 
   return (
-    <div
-      className="relative flex h-full w-full items-center justify-center overflow-hidden"
-      style={{ cursor: isPanning ? "grabbing" : "grab" }}
-      onWheel={onWheel}
-      onMouseDown={onMouseDown}
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onMouseLeave={onMouseUp}
-    >
-      {/* Zoom/pan wrapper */}
-      <div
-        style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          transformOrigin: "center center",
-          transition: isPanning ? "none" : "transform 0.2s ease-out",
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {/* Aspect-ratio-locked canvas */}
-        <div
-          className="relative"
-          style={{
-            aspectRatio: `${VB_W} / ${VB_H}`,
-            maxWidth: "100%",
-            maxHeight: "100%",
-          }}
+    <div className="relative flex h-full flex-col">
+      {/* React Flow canvas */}
+      <div className="flex-1">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          onNodeClick={onNodeClick}
+          fitView
+          fitViewOptions={{ padding: 0.3 }}
+          minZoom={0.4}
+          maxZoom={1.5}
+          proOptions={{ hideAttribution: true }}
         >
-          {/* SVG spine layer */}
-          <SpineSVG
-            overlayOpen={selectedNodeId !== null}
-            highlightedThreadId={highlightedThreadId}
-          />
-
-          {/* Node cards */}
-          {DEMO_NODES.map((node) => (
-            <ArcNode
-              key={node.id}
-              node={node}
-              selected={selectedNodeId === node.id}
-              highlightedThreadId={highlightedThreadId}
-              onClick={() => onNodeClick(node.id)}
-            />
-          ))}
-        </div>
+          <Background color="#e8e4dc" gap={24} size={1} />
+        </ReactFlow>
       </div>
 
-      {/* Reset view button — outside zoom wrapper */}
-      {(zoom !== 1 || pan.x !== 0 || pan.y !== 0) && (
-        <button
-          onClick={resetView}
-          className="absolute right-3 top-3 z-20 rounded-md border border-cream-1 bg-white/90 px-2.5 py-1 text-[10px] text-smoke/50 backdrop-blur-sm transition-all duration-150 hover:text-smoke/80"
-        >
-          Reset view
-        </button>
-      )}
-
-      {/* Thread legend — outside zoom wrapper */}
+      {/* Thread legend — floating panel */}
       <ThreadLegend
         threads={DEMO_THREADS}
-        hoveredThreadId={highlightedThreadId}
-        onHoverThread={setHighlightedThreadId}
+        hoveredThreadId={hoveredThreadId}
+        onHoverThread={setHoveredThreadId}
       />
 
-      {/* Node detail overlay — outside zoom wrapper */}
+      {/* Node detail overlay */}
       {selectedNode && (
         <NodeDetailOverlay
           node={selectedNode}

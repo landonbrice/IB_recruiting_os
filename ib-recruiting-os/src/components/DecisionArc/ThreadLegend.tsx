@@ -14,52 +14,31 @@ export default function ThreadLegend({
   onHoverThread,
 }: ThreadLegendProps) {
   return (
-    <div
-      className="absolute bottom-4 left-3 z-20 rounded-[10px] border-[0.5px] border-cream-1 p-3"
-      style={{
-        background: "rgba(255,255,255,0.94)",
-        backdropFilter: "blur(10px)",
-      }}
-    >
-      <div className="mb-2 text-[8px] font-semibold uppercase tracking-wider text-smoke/25">
-        Threads
-      </div>
+    <div className="absolute bottom-14 left-3 z-10 rounded-lg border border-cream-1 bg-white p-3">
       <div className="space-y-2">
-        {threads.map((t) => {
-          const isActive = hoveredThreadId === t.id;
-          const isDimmed = hoveredThreadId !== null && !isActive;
-          return (
+        {threads.map((t) => (
+          <div
+            key={t.id}
+            className="flex cursor-default items-center gap-2 transition-opacity duration-150"
+            style={{
+              opacity: hoveredThreadId && hoveredThreadId !== t.id ? 0.3 : 1,
+            }}
+            onMouseEnter={() => onHoverThread(t.id)}
+            onMouseLeave={() => onHoverThread(null)}
+          >
             <div
-              key={t.id}
-              className="flex cursor-default items-center gap-2"
-              style={{
-                opacity: isDimmed ? 0.2 : 1,
-                transition: "opacity 0.25s",
-              }}
-              onMouseEnter={() => onHoverThread(t.id)}
-              onMouseLeave={() => onHoverThread(null)}
+              className="h-2 w-2 flex-shrink-0 rounded-full"
+              style={{ backgroundColor: t.color }}
+            />
+            <span
+              className="text-[11px] font-medium"
+              style={{ color: t.color }}
             >
-              <div
-                className="flex-shrink-0 rounded-full"
-                style={{
-                  width: 8,
-                  height: 8,
-                  backgroundColor: t.color,
-                  transform: isActive ? "scale(1.3)" : "scale(1)",
-                  boxShadow: isActive ? `0 0 8px ${t.color}50` : "none",
-                  transition: "transform 0.25s, box-shadow 0.25s",
-                }}
-              />
-              <span
-                className="text-[11px] font-medium"
-                style={{ color: isActive ? t.color : "#2a2826" }}
-              >
-                {t.label}
-              </span>
-              <span className="text-[9px] text-[#a8a29e]">{t.desc}</span>
-            </div>
-          );
-        })}
+              {t.label}
+            </span>
+            <span className="text-[10px] text-[#a8a29e]">{t.desc}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
