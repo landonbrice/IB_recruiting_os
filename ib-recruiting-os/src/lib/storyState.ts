@@ -1,4 +1,5 @@
 import { createServerClient } from "@/lib/supabase/server";
+import type { ResumeBullet } from "./resumeTypes";
 
 // ── Core Types ──────────────────────────────────────────────────────────────
 
@@ -85,6 +86,7 @@ export interface StoryRef {
 export interface ResumeState {
   rawText: string;
   sections: unknown[];
+  bullets: ResumeBullet[];
 }
 
 export interface CoverLetterState {
@@ -140,6 +142,7 @@ export function emptyStoryState(): StoryState {
     resumeState: {
       rawText: "",
       sections: [],
+      bullets: [],
     },
     coverLetterState: {
       opening: "",

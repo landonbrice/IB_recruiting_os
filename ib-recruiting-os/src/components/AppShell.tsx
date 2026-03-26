@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import NavBar, { type TabId } from "@/components/NavBar";
 import CoachPanel from "@/components/CoachPanel";
 import BottomBar from "@/components/BottomBar";
 import DecisionArc from "@/components/DecisionArc";
 import StoryBank from "@/components/StoryBank";
+import ResumeTab from "@/components/ResumeTab";
 
 const TAB_LABELS: Record<TabId, string> = {
   resume: "Resume",
@@ -16,7 +17,6 @@ const TAB_LABELS: Record<TabId, string> = {
 };
 
 const TAB_DESCRIPTIONS: Partial<Record<TabId, string>> = {
-  resume: "Coming soon",
   cover: "Coming soon",
   targets: "Coming soon",
 };
@@ -34,6 +34,13 @@ function TabPlaceholder({ tab }: { tab: TabId }) {
 
 export default function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>("arc");
+  const [hideCoach, setHideCoach] = useState(false);
+
+  const handleHideCoach = useCallback((hide: boolean) => {
+    setHideCoach(hide);
+  }, []);
+
+  const showCoach = !(hideCoach && activeTab === "resume");
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -43,13 +50,27 @@ export default function AppShell() {
         {/* Cream Canvas */}
         <div className="flex-1 p-[10px]">
           <div className="relative flex h-full flex-col overflow-auto rounded-[10px] bg-cream">
+            {activeTab === "resume" && <ResumeTab onHideCoach={handleHideCoach} />}
             {activeTab === "arc" && <DecisionArc />}
             {activeTab === "stories" && <StoryBank />}
-            {activeTab !== "arc" && activeTab !== "stories" && <TabPlaceholder tab={activeTab} />}
+            {activeTab !== "resume" && activeTab !== "arc" && activeTab !== "stories" && (
+              <TabPlaceholder tab={activeTab} />
+            )}
           </div>
         </div>
 
-        <CoachPanel />
+        {/* Coach Panel with fade transition */}
+        <div
+          style={{
+            width: showCoach ? 220 : 0,
+            opacity: showCoach ? 1 : 0,
+            overflow: "hidden",
+            transition: "width 250ms ease, opacity 200ms ease",
+            flexShrink: 0,
+          }}
+        >
+          <CoachPanel />
+        </div>
       </div>
 
       <BottomBar activeTab={activeTab} />
