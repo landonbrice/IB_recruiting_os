@@ -1,7 +1,7 @@
 # CLAUDE.md — IB Recruiting OS
 
-> This file is the source of truth for any AI agent working on this codebase.
-> Read this FIRST before touching any file. Last updated: 2026-03-21.
+> Source of truth for any AI agent working on this codebase.
+> Audit date: 2026-03-26. Previous version: 2026-03-21.
 
 ---
 
@@ -22,211 +22,254 @@ Cover letter = narrative rendering of Arc threads + target bank lens.
 
 ---
 
+## Current State (Honest Assessment)
+
+**Two parallel architectures exist in the codebase:**
+
+1. **The Working MVP** (chat-first coaching loop): Upload → Parse → Intake → Streaming Chat → Protocol Blocks → Resume Updates → Scoring → Export. This flow is fully functional but lives in components (ChatPanel, ResumePanel, ActionSidebar, useCoachSession) that are **no longer rendered** by the current app shell.
+
+2. **The New Smoke+Cream Shell** (AppShell with 5 tabs): Beautiful UI shell with DecisionArc (React Flow) and StoryBank components rendered from demo data. CoachPanel and BottomBar are stubs. Resume/Cover/Targets tabs show "Coming soon." **No integration with the working coaching flow or storyState persistence.**
+
+**The #1 architectural task is bridging these two systems.** The working chat/coaching logic needs to flow through the new shell, and the new visual components need to read/write storyState instead of demo data.
+
+### Component Status
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Landing page (`/`) | ✅ Working | Upload, beta gate, drag-drop, session handoff |
+| `/api/parse-resume` | ✅ Working | PDF + DOCX extraction |
+| `/api/chat` | ✅ Working | Streaming SSE, system prompt, bank context |
+| `/api/suggest` | ✅ Working | 2-phase bullet rewrites with confidence/risk |
+| `/api/beta-auth` | ✅ Working | Password gate |
+| `useCoachSession` hook | ✅ Working | Full session state, localStorage persist, protocol parsing |
+| `ChatPanel` | ✅ Working | Streaming, markdown, quick prompts — **not rendered in AppShell** |
+| `ResumePanel` | ✅ Working | PDF/HTML/text display, click-to-edit — **not rendered in AppShell** |
+| `BulletModal` | ✅ Working | 2-phase rewrite with plausibility checks |
+| `ActionSidebar` | ✅ Working | Score gauge, readiness, tools — **not rendered in AppShell** |
+| `ScoreCard` | ✅ Working | Category breakdown, gauge, working/hurting |
+| `IntakeForm` | ✅ Working | Stage, bank tier, target group chips |
+| `ExportModal` | ✅ Working | Resume, story, networking, session JSON export |
+| `AppShell` | 🚧 Shell only | 5 tabs, NavBar, cream canvas. No data flow |
+| `NavBar` | ✅ Working | Logo, tabs, beta indicator |
+| `CoachPanel` | ❌ Stub | Placeholder UI, input disabled, no integration |
+| `BottomBar` | ❌ Stub | Buttons render, no onClick handlers |
+| DecisionArc (React Flow) | 🚧 Demo only | Full UI works but hardcoded demo data |
+| StoryBank | 🚧 Demo only | Cards, stepping stones, coverage — all demo data |
+| `TMAYBuilder` | 🚧 UI only | Renders but Edit/Refine buttons do nothing |
+| Cover Letter tab | 💡 Not started | "Coming soon" placeholder |
+| Targets tab | 💡 Not started | "Coming soon" placeholder |
+| Resume tab (in AppShell) | 💡 Not started | "Coming soon" — old ResumePanel exists but isn't wired |
+| `storyState.ts` | ✅ Working | Types + Supabase CRUD. **No component consumes it** |
+| `llm.ts` | ✅ Working | DeepSeek + Anthropic provider abstraction |
+| `protocolParser.ts` | ✅ Working | Parses existing block types (resume-update, score, profile, etc.) |
+| `bankProfiles.ts` | 🚧 ~80% TODO | 15 banks scaffolded, qualitative fields are `[LANDON TODO]` |
+| `ibExemplars.ts` | ✅ Working | 62 curated IB bullets with relevance scoring |
+| `systemPrompt.ts` | ✅ Working | Full coach prompt + bank context injection |
+| Supabase clients | ✅ Working | Browser + server wrappers. **Not used by any page yet** |
+
+---
+
 ## Tech Stack
 
-- **Framework:** Next.js 14 (App Router) + TypeScript
-- **Styling:** Tailwind CSS (Smoke + Cream design system — see below)
-- **AI (dev):** DeepSeek Reasoning via OpenAI-compatible client
-- **AI (prod):** Anthropic Claude Sonnet via provider abstraction layer
-- **Auth + DB:** Supabase (Postgres + Auth + RLS)
-- **File parsing:** pdf-parse (PDF) + mammoth (DOCX)
-- **State:** React state + Supabase persistence. Zustand if complexity demands.
-- **Decision Arc UI:** React Flow (draggable nodes, edge connections)
-- **Deployment:** Vercel
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| Framework | Next.js (App Router) | 16.1.6 |
+| Language | TypeScript | 5.x |
+| Styling | Tailwind CSS | 3.4.1 |
+| AI (dev) | DeepSeek Reasoning via OpenAI-compatible client | openai 6.27 |
+| AI (prod) | Anthropic Claude Sonnet | @anthropic-ai/sdk 0.78 |
+| Auth + DB | Supabase (Postgres + Auth + RLS) | @supabase/supabase-js 2.99 |
+| File parsing | pdf-parse (PDF) + mammoth (DOCX) | 1.1.1 / 1.11 |
+| Decision Arc UI | React Flow | @xyflow/react 12.10 |
+| Chat rendering | react-markdown + remark-gfm | 10.1 / 4.0 |
+| Deployment | Vercel (target) | — |
+
+**Not installed but may be needed:** Zustand (state management), testing library, UUID library.
+
+---
+
+## Project Structure
+
+```
+IB_recruiting_os/
+├── CLAUDE.md                    ← This file (source of truth)
+├── LOUIS_BUILD_LOG.md           ← Build history (2nd + 3rd passes)
+├── .env.local                   ← ANTHROPIC_API_KEY, DEEPSEEK_API_KEY
+├── .gitignore
+│
+└── ib-recruiting-os/            ← Next.js application root
+    ├── .env.local               ← Same API keys (duplicated)
+    ├── .env.example             ← Incomplete — only shows DEEPSEEK_API_KEY
+    ├── package.json
+    ├── tailwind.config.ts       ← Smoke+Cream color tokens
+    ├── tsconfig.json
+    ├── next.config.mjs          ← pdf-parse as serverExternalPackage
+    ├── postcss.config.mjs
+    ├── eslint.config.mjs
+    ├── current_state.md         ← Status snapshot (2026-03-21, partially stale)
+    ├── README.md                ← Quick-start guide
+    │
+    ├── context/
+    │   └── competitive/
+    │       └── resume-worded-model.md   ← Competitive analysis
+    │
+    ├── scripts/
+    │   ├── fill-bank-profiles.md        ← Instructions for Landon
+    │   └── smoke.sh                     ← QA smoke test (6 checks)
+    │
+    └── src/
+        ├── proxy.ts                     ← Beta gate middleware
+        │
+        ├── app/
+        │   ├── layout.tsx               ← Root layout (Space Grotesk font)
+        │   ├── page.tsx                 ← Landing page (upload + beta gate)
+        │   ├── globals.css              ← Tailwind directives + custom styles
+        │   └── app/
+        │       ├── layout.tsx           ← App layout (Smoke bg, fixed viewport)
+        │       ├── page.tsx             ← Renders AppShell
+        │       └── loading.tsx          ← Suspense fallback
+        │
+        ├── app/api/
+        │   ├── chat/route.ts            ← Streaming coach conversation
+        │   ├── suggest/route.ts         ← 2-phase bullet rewrites
+        │   ├── parse-resume/route.ts    ← PDF/DOCX text extraction
+        │   └── beta-auth/route.ts       ← Invite code verification
+        │
+        ├── hooks/
+        │   └── useCoachSession.ts       ← Session state (localStorage persist)
+        │
+        ├── lib/
+        │   ├── llm.ts                   ← Provider abstraction (DeepSeek/Anthropic)
+        │   ├── storyState.ts            ← StoryState types + Supabase CRUD
+        │   ├── types.ts                 ← Chat/resume types (overlaps storyState.ts)
+        │   ├── systemPrompt.ts          ← Coach system prompt + bank context
+        │   ├── protocolParser.ts        ← Structured block extraction
+        │   ├── resumeStructure.ts       ← Resume line enrichment
+        │   ├── coachActions.ts          ← Predefined coach action prompts
+        │   ├── sse.ts                   ← SSE stream consumer
+        │   ├── bankProfiles.ts          ← 15 bank profiles (~80% TODO)
+        │   ├── ibExemplars.ts           ← 62 IB bullet exemplars
+        │   ├── plausibilityCheck.ts     ← Rewrite safety validator
+        │   ├── sessionLog.ts            ← In-session event logger
+        │   └── supabase/
+        │       ├── client.ts            ← Browser Supabase client
+        │       └── server.ts            ← Server Supabase client (service role)
+        │
+        └── components/
+            ├── AppShell.tsx             ← Smoke+Cream shell (5 tabs)
+            ├── NavBar.tsx               ← Tab switcher + logo
+            ├── CoachPanel.tsx           ← Right sidebar (STUB)
+            ├── BottomBar.tsx            ← Context action buttons (STUB)
+            ├── ChatPanel.tsx            ← Streaming chat UI
+            ├── ResumePanel.tsx          ← Resume display + editing
+            ├── BulletModal.tsx          ← Bullet rewrite modal
+            ├── IntakeForm.tsx           ← Candidate profiling
+            ├── ActionSidebar.tsx        ← Score + readiness + tools
+            ├── ScoreCard.tsx            ← Score category breakdown
+            ├── FeasibilityCard.tsx      ← Feasibility gauge
+            ├── ExportModal.tsx          ← Session artifact download
+            ├── UploadOverlay.tsx        ← Drag-drop resume upload
+            │
+            ├── DecisionArc/
+            │   ├── index.tsx            ← React Flow canvas + legend
+            │   ├── ArcNode.tsx          ← Node component
+            │   ├── NodeDetailOverlay.tsx ← Click-to-zoom detail
+            │   ├── ThreadEdge.tsx       ← Colored bezier edges
+            │   ├── ThreadLegend.tsx     ← Thread color legend
+            │   ├── ThreadBadge.tsx      ← Inline thread pill
+            │   ├── ImpactBadge.tsx      ← IMPACT type badge
+            │   ├── StatusBadge.tsx      ← Draft/Ready indicator
+            │   ├── SteppingStoneBar.tsx ← 4-stage progress bar
+            │   ├── SteppingStoneExpanded.tsx ← Full stepping stone view
+            │   └── demoData.ts          ← Hardcoded demo arc + threads
+            │
+            └── StoryBank/
+                ├── index.tsx            ← Story bank main view
+                ├── StoryCard.tsx        ← Individual story card
+                ├── StoryDetail.tsx      ← Detail panel
+                ├── SteppingStoneVisual.tsx ← Vertical flow visual
+                ├── CoverageTracker.tsx  ← IMPACT coverage chart
+                ├── QuickReference.tsx   ← Answer framework reference
+                └── TMAYBuilder.tsx      ← "Tell me about yourself" card
+```
 
 ---
 
 ## Design System — "Smoke + Cream"
 
-### Surfaces (three-layer depth)
-| Surface | Hex | Role |
-|---------|-----|------|
-| Smoke | `#2a2826` | App shell, nav bar, coach panel, bottom bar |
-| Cream | `#f0ece4` | Workspace canvas (center stage). 10px inset with border-radius inside dark shell. |
-| White | `#ffffff` | Cards, documents, modals, node interiors |
+### Surfaces
+| Surface | Hex | Tailwind Token | Role |
+|---------|-----|----------------|------|
+| Smoke | `#2a2826` | `smoke` | App shell, nav, coach panel, bottom bar |
+| Smoke+1 | `#353230` | `smoke-1` | Elevated dark (coach cards, chat bubbles) |
+| Smoke+2 | `#46423f` | `smoke-2` | Hover on dark surfaces |
+| Cream | `#F5F1EA` | `cream` | Workspace canvas (10px inset) |
+| Cream-1 | `#e8e4dc` | `cream-1` | Borders on cream, dividers |
+| White | `#ffffff` | — | Cards, documents, modals |
 
-Supporting:
-- Smoke+1: `#353230` (elevated dark — coach cards, chat bubbles)
-- Smoke+2: `#46423f` (hover on dark surfaces)
-- Cream-1: `#e8e4dc` (borders on cream, dividers)
+**⚠️ Known issue:** Tailwind cream is `#F5F1EA` but the DIRECTION doc specifies `#f0ece4`. Pick one and update the other.
 
-### Colors
-| Token | Hex | Usage |
-|-------|-----|-------|
-| Terracotta | `#d4845a` | Primary accent — CTAs, active tabs, thread lines, logo |
-| Amber | `#d97706` | Warnings, score highlights, "needs attention" |
-| Green | `#22c55e` | Success, strong bullets, story completeness |
-| Red | `#ef4444` | Errors, weak bullets, issues |
+### Accent Colors
+| Token | Hex | Tailwind | Usage |
+|-------|-----|----------|-------|
+| Terracotta | `#d4845a` | `terracotta` | Primary accent — CTAs, active tabs, thread lines |
+| Amber | `#d97706` | `amber-500` (default) | Warnings, "needs attention" |
+| Green | `#22c55e` | `green-500` (default) | Success, strong bullets |
+| Red | `#ef4444` | `red-500` (default) | Errors, weak bullets |
 
-Thread colors: terracotta (primary) + muted blue `#6366f1` + muted red `#dc2626` + muted green `#059669`
+Amber, green, and red use Tailwind's default palette — not in tailwind.config.ts.
 
 ### Typography
-- UI headlines: Space Grotesk or Geist, 600 weight, 16-20px
-- Body: Space Grotesk or Geist, 400-500 weight, 13-15px
-- Labels: same family, 400, 10-12px
+- Font: Space Grotesk (loaded via `next/font/local` as `--font-space-grotesk`)
+- Headings: 600 weight, 16-20px
+- Body: 400-500, 13-15px
+- Labels: 400, 10-12px
 - Letter-spacing: -0.2 to -0.5px on headlines
-
-### Layout
-- Border radius: 10-12px cards, 5-6px buttons, 50% avatars
-- Cream canvas: 10px margin inside dark shell, 10px border-radius
-- Nav bar: Smoke background, tabs centered
-- Coach panel: right column, 160-220px, dark background, always visible
-- Bottom bar: Smoke, thin top border, contextual action buttons per tab
-
-### OLD THEMES — REMOVED
-Theme A ("Operator"), Theme B ("Platform"), Theme C ("Terminal") are all deprecated.
-All files in `src/themes/` should be deleted. The unified Smoke + Cream design replaces them.
-`src/lib/uiConfig.ts` theme switching logic should be removed.
-
----
-
-## App Shell Layout
-
-```
-┌──────────────────────────────────────────────────────┐
-│  [Logo]  [Resume] [Arc] [Stories] [CL] [Targets]  [User]  │  ← Nav (Smoke)
-├─────────────────────────────────────────┬────────────┤
-│                                         │            │
-│         Cream Canvas (10px inset)       │   Coach    │
-│                                         │   Panel    │
-│   ┌──────────────────────────┐          │  (Smoke+1) │
-│   │  White card / document   │          │            │
-│   │  (varies by active tab)  │          │            │
-│   └──────────────────────────┘          │            │
-│                                         │            │
-├─────────────────────────────────────────┴────────────┤
-│  [Contextual action buttons per tab]                  │  ← Bottom bar (Smoke)
-└──────────────────────────────────────────────────────┘
-```
-
-Five tabs: Resume, Decision Arc, Story Bank, Cover Letter, Targets.
 
 ---
 
 ## Core Data Model — storyState
 
-Everything in the product derives from this object. Persisted in Supabase as JSONB.
+Everything derives from this object. Defined in `src/lib/storyState.ts`. Persisted in Supabase as JSONB.
+**Currently no component reads from or writes to storyState.** DecisionArc and StoryBank consume hardcoded demo data.
 
-```typescript
-interface StoryState {
-  decisionArc: {
-    nodes: ArcNode[];
-    threads: Thread[];
-    crystallizingMoment: string;
-    whyIB: string;
-    futureVision: string;
-  };
-  storyBank: {
-    stories: StoryRef[];
-    tellMeAboutYourself: { narrative: string; userRefinements: string; lastUpdated: string };
-  };
-  candidateProfile: CandidateProfile;
-  targets: Target[];
-  resumeState: ResumeState;
-  coverLetterState: CoverLetterState;
-  preparedAnswers: PreparedAnswers;
-}
+Key interfaces: `StoryState`, `ArcNode`, `ImpactStory`, `Thread`, `CandidateProfile`, `Target`, `PreparedAnswers`, `StoryRef`, `ResumeState`, `CoverLetterState`.
 
-interface ArcNode {
-  id: string;
-  label: string;           // "King's Ransom Group"
-  sub: string;             // "M&A Healthcare Intern"
-  timeframe: string;
-  type: "experience" | "education" | "non-resume" | "upcoming" | "goal";
-  positives: string[];     // QUALITIES gained, NOT bullet restates
-  negatives: string[];     // What pushed them onward
-  impactStories: ImpactStory[];
-  setMetGoals: { set: string; met: string; metric: string }[];
-}
-
-interface ImpactStory {
-  id: string;
-  type: "I" | "M" | "P" | "A" | "C" | "T";
-  status: "draft" | "ready";
-  nickname: string;
-  steppingStone: {
-    answerFirst: string;
-    actions: string[];
-    tension: string;
-    resolution: string;
-  };
-  ibConnection: string;
-  valueAdd: { category: string; past: string; future: string };
-}
-
-interface Thread {
-  id: string;
-  label: string;           // "Ownership & Execution"
-  nodeIds: string[];
-  color: string;
-  desc: string;
-}
-
-interface CandidateProfile {
-  schoolTier: "target" | "semi-target" | "non-target";
-  stage: "freshman" | "sophomore" | "junior" | "senior" | "mba" | "career-switcher";
-  background: string;
-  experienceLevel: string;
-  targetBankTier: "bulge-bracket" | "elite-boutique" | "middle-market" | "regional";
-  targetGroup: string;
-}
-
-interface Target {
-  bank: string;
-  group: string;
-  whyThisBank: string;
-  relevantThreads: string[];
-  relevantNodes: string[];
-  coverLetterAngle: string;
-  notes: string;
-}
-
-interface PreparedAnswers {
-  whyBanking: { claim: string; reason: string; evidence: string; impact: string };
-  weakness: { acknowledge: string; bridge: string; cover: string; dangle: string };
-  recentDeals: { name: string; dates: string; value: string; consideration: string; rationale: string; risks: string }[];
-  industryTrends: { headline: string; hook: string; drivers: string; tailwinds: string; headwinds: string; deals: string }[];
-}
-```
+The older `src/lib/types.ts` has overlapping types (`CandidateProfile`, `ResumeState`, `Message`, `ChatMode`, etc.) used by the chat flow. These need consolidation.
 
 ### Critical: +/- Annotations Extract QUALITIES
 
-When the LLM reverse-engineers a Decision Arc from a resume, the positives/negatives must describe **traits and insights**, not restate bullets.
-
-Wrong: `"Sourced 30+ mandates"` (that's a bullet)
-Right: `"Learned trust matters more than logic in deal origination"` (that's a quality)
-
-Wrong: `"Real M&A exposure"` (vague restatement)
-Right: `"Earned responsibility through incessant drive — asked for more when there was nothing"` (that's character)
+Wrong: `"Sourced 30+ mandates"` (bullet restate)
+Right: `"Learned trust matters more than logic in deal origination"` (quality)
 
 ### Non-Resume Nodes
 
-The Decision Arc supports experiences NOT on the resume. Some of a candidate's strongest stories come from academic moments, personal projects, or life events. The coach should proactively ask: "Is there anything important that ISN'T on this resume?"
+The Decision Arc supports experiences NOT on the resume. Coach should proactively ask: "Is there anything important that ISN'T on this resume?"
 
 ---
 
 ## Protocol Blocks
 
-The coach emits structured JSON blocks in its responses. The client parses these to update storyState.
-
-### Existing (keep):
+### Implemented (parsed + applied in useCoachSession):
 ```
 resume-update        // { section, company, bulletIndex, newText }
 resume-score         // { total, categories[], working[], hurting[], nextStep }
 profile-update       // { schoolTier?, stage?, background?, ... }
 story-output         // { whyIB, thread, crystallizingMoment }
 networking-actions   // { actions[], template }
+feasibility-score    // { score, assessment, biggestLeverage, ... }
+cover-letter         // { opening, middle, close } — parsed but not displayed
 ```
 
-### New (to build):
+### Defined but not yet implemented:
 ```
-decision-arc-update  // { nodeId, field, value } — patch a node's annotations/stories
-impact-story         // { nodeId, story: ImpactStory } — add/update a story on a node
-stepping-stone       // { storyId, stage, content } — update one stage of a stepping stone
-thread-update        // { threadId, label?, nodeIds?, color? } — create/update thread
-story-bank-update    // { storyId, status?, nickname? } — promote/update story in bank
-cover-letter-update  // { section, content } — update opening/middle/close
-target-update        // { bank, group, whyThisBank?, relevantThreads?, coverLetterAngle? }
+decision-arc-update  // { nodeId, field, value }
+impact-story         // { nodeId, story: ImpactStory }
+stepping-stone       // { storyId, stage, content }
+thread-update        // { threadId, label?, nodeIds?, color? }
+story-bank-update    // { storyId, status?, nickname? }
+cover-letter-update  // { section, content }
+target-update        // { bank, group, whyThisBank?, relevantThreads? }
 tmay-update          // { narrative?, userRefinements? }
 readiness-score      // { score, assessment, biggestGap, strengths }
 template-check       // { compliance: "pass"|"revise"|"reject", flags[] }
@@ -236,185 +279,151 @@ template-check       // { compliance: "pass"|"revise"|"reject", flags[] }
 
 ## LLM Provider Abstraction
 
-All LLM calls go through `src/lib/llm.ts` (TO BE BUILT). This module reads `LLM_PROVIDER` env var and routes accordingly.
+`src/lib/llm.ts` — fully implemented.
 
 ```typescript
-// src/lib/llm.ts
-export async function streamChat(messages, systemPrompt, options?) → ReadableStream
-export async function complete(prompt, options?) → string
+export async function streamChatCompletion(opts) → AsyncIterable<string>
+export async function complete(opts) → string
+export function getProviderInfo() → { provider: string; model: string }
 ```
 
-- `LLM_PROVIDER=deepseek` → calls api.deepseek.com (dev)
-- `LLM_PROVIDER=anthropic` → calls Anthropic API (prod)
-
-API routes (`/api/chat`, `/api/suggest`) import from `src/lib/llm.ts`, never from OpenAI or Anthropic directly.
+- `LLM_PROVIDER=deepseek` → DeepSeek via OpenAI SDK
+- `LLM_PROVIDER=anthropic` → Anthropic via @anthropic-ai/sdk
 
 ---
 
-## Supabase Schema
+## Environment Variables
 
-```sql
--- Run this migration after Supabase project is created
+**Required (LLM):**
+```
+DEEPSEEK_API_KEY=       # Dev provider
+ANTHROPIC_API_KEY=      # Prod provider
+```
 
--- Profiles table (extends auth.users)
-create table public.profiles (
-  id uuid references auth.users on delete cascade primary key,
-  email text,
-  display_name text,
-  created_at timestamp with time zone default now(),
-  last_active timestamp with time zone default now()
-);
+**Required for Supabase (not yet used):**
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```
 
--- Story states (one per user, JSONB blob)
-create table public.story_states (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users on delete cascade unique not null,
-  state jsonb not null default '{}',
-  updated_at timestamp with time zone default now(),
-  created_at timestamp with time zone default now()
-);
-
--- Sessions (coaching session tracking)
-create table public.sessions (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users on delete cascade not null,
-  started_at timestamp with time zone default now(),
-  ended_at timestamp with time zone,
-  events jsonb default '[]'
-);
-
--- Row Level Security
-alter table public.profiles enable row level security;
-alter table public.story_states enable row level security;
-alter table public.sessions enable row level security;
-
-create policy "Users read own profile" on public.profiles for select using (auth.uid() = id);
-create policy "Users update own profile" on public.profiles for update using (auth.uid() = id);
-create policy "Users insert own profile" on public.profiles for insert with check (auth.uid() = id);
-
-create policy "Users read own state" on public.story_states for select using (auth.uid() = user_id);
-create policy "Users write own state" on public.story_states for insert with check (auth.uid() = user_id);
-create policy "Users update own state" on public.story_states for update using (auth.uid() = user_id);
-
-create policy "Users read own sessions" on public.sessions for select using (auth.uid() = user_id);
-create policy "Users write own sessions" on public.sessions for insert with check (auth.uid() = user_id);
-create policy "Users update own sessions" on public.sessions for update using (auth.uid() = user_id);
-
--- Auto-create profile on signup
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, email)
-  values (new.id, new.email);
-  return new;
-end;
-$$ language plpgsql security definer;
-
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
+**Optional:**
+```
+BETA_PASSWORD=          # Enables invite-code gate if set
+LLM_PROVIDER=           # "deepseek" (default) or "anthropic"
 ```
 
 ---
 
 ## Route Map
 
-| Route | Type | Purpose |
-|-------|------|---------|
-| `/` | Static | Landing page (light palette, scroll marketing) |
-| `/app` | Client | Main workspace (Smoke + Cream, tab-based) |
-| `/api/chat` | SSE | Streaming coach conversation |
-| `/api/parse-resume` | POST | PDF/DOCX text extraction |
-| `/api/suggest` | SSE | Per-bullet rewrite suggestions |
-| `/api/beta-auth` | POST | Invite code verification |
-| `/api/generate-arc` | POST | NEW — reverse-engineer Decision Arc from resume text |
+| Route | Type | Status | Purpose |
+|-------|------|--------|---------|
+| `/` | Page | ✅ | Landing page + resume upload + beta gate |
+| `/app` | Page | 🚧 | Main workspace (AppShell shell only) |
+| `/api/chat` | SSE | ✅ | Streaming coach conversation |
+| `/api/parse-resume` | POST | ✅ | PDF/DOCX text extraction |
+| `/api/suggest` | SSE | ✅ | 2-phase bullet rewrite suggestions |
+| `/api/beta-auth` | POST | ✅ | Invite code verification |
+| `/api/generate-arc` | POST | 💡 | Planned — reverse-engineer Arc from resume |
+
+---
+
+## How to Run
+
+```bash
+cd ib-recruiting-os
+npm install
+cp .env.example .env.local
+# Fill in DEEPSEEK_API_KEY (minimum) or ANTHROPIC_API_KEY
+npm run dev
+```
+
+Smoke test: `npm run smoke` (requires dev server on :3000)
+
+---
+
+## Known Issues & Gotchas
+
+1. **Dual architecture:** Old chat flow (useCoachSession) and new AppShell are disconnected. This is THE critical integration task.
+2. **Type duplication:** `types.ts` and `storyState.ts` both define `CandidateProfile`. Consolidate.
+3. **Cream color mismatch:** Tailwind `#F5F1EA` vs DIRECTION doc `#f0ece4`.
+4. **bankProfiles.ts:** ~80% `[LANDON TODO]` placeholders.
+5. **No tests.** No testing framework installed.
+6. **No Supabase in pages.** Clients exist, CRUD exists, everything uses localStorage.
+7. **Demo data baked in.** DecisionArc/StoryBank import from demoData.ts, not props/context.
+8. **CoachPanel is dead.** Input disabled, no integration.
+9. **patchStoryState() is shallow** — deep nested updates clobber subtrees.
+10. **No UUID library** for generating node/story/thread IDs.
+11. **.env.example incomplete** — missing most required vars.
 
 ---
 
 ## Build Priority
 
-0. **Foundation:** Supabase integration, provider abstraction (`src/lib/llm.ts`), Smoke + Cream design tokens, strip old themes, storyState TypeScript types
-1. **Decision Arc:** React Flow graph, draft-from-resume LLM prompt, click-to-zoom node detail, editable +/- annotations, thread visualization
-2. **Story Bank:** Story cards, Stepping Stone visual (circle/arrow flow), IMPACT coverage tracker, TMAY builder, Quick Reference panel, practice mode
-3. **Resume Templates:** Rules-based compliance checker, export to Classic/Modern-Clean templates
-4. **Cover Letter + Targeting:** Cover letter tab, target management, per-target arc lens, comparison view
-5. **Readiness Score:** Scoring model, UI, storyState completeness integration
-6. **Paywall + Landing:** Stripe, paywall gates, landing page redesign, analytics
+0. **Bridge the gap:** Wire useCoachSession into AppShell. Chat flows through CoachPanel. Resume tab renders ResumePanel.
+1. **StoryState integration:** Replace demo data with storyState. Protocol blocks patch storyState. Add Supabase persistence.
+2. **Decision Arc live:** `/api/generate-arc` endpoint. Protocol blocks create arc nodes. React Flow reads storyState.
+3. **Story Bank live:** Stories flow from arc nodes into bank. Coach interactions update via protocol blocks.
+4. **Cover Letter + Targeting:** Cover letter tab, target management, per-target arc lens.
+5. **Resume Templates:** Rules-based compliance checker, export templates.
+6. **Readiness Score:** Scoring model from storyState completeness.
+7. **Paywall + Landing:** Stripe, paywall gates, landing redesign.
 
 ---
 
-## What Exists (Reusable)
+## What Must NOT Be Removed
 
-These modules are solid and should be preserved/adapted:
-- `src/hooks/useCoachSession.ts` — session state management (needs extension for storyState)
-- `src/lib/protocolParser.ts` — structured block extraction (needs new block types added)
-- `src/lib/sse.ts` — shared SSE stream parser
-- `src/lib/resumeStructure.ts` — resume line enrichment
-- `src/lib/coachActions.ts` — coach action/prompt configurations
-- `src/components/BulletModal.tsx` — bullet rewrite UI
-- `src/components/IntakeForm.tsx` — initial intake capture
-- `src/app/api/parse-resume/route.ts` — resume parsing
-- `src/app/api/chat/route.ts` — streaming chat (refactor to use llm.ts)
-- `src/app/api/suggest/route.ts` — bullet suggestions (refactor to use llm.ts)
-- `src/middleware.ts` — beta gate logic
+- `src/hooks/useCoachSession.ts` — extend, don't rewrite
+- `src/lib/protocolParser.ts` — add new block types
+- `src/lib/llm.ts` — complete
+- `src/lib/sse.ts` — complete
+- `src/lib/resumeStructure.ts` — complete
+- `src/lib/storyState.ts` — complete (needs consumers)
+- `src/lib/systemPrompt.ts` — complete
+- `src/lib/ibExemplars.ts` — complete
+- `src/lib/plausibilityCheck.ts` — complete
+- `src/components/ChatPanel.tsx` — needs integration, not rewrite
+- `src/components/ResumePanel.tsx` — needs integration, not rewrite
+- `src/components/DecisionArc/*` — needs data binding, not rewrite
+- `src/components/StoryBank/*` — needs data binding, not rewrite
 
-## What Must Be Removed
+---
 
-- `src/themes/ThemeA.tsx` — deleted
-- `src/themes/ThemeB.tsx` — deleted
-- `src/themes/ThemeC.tsx` — deleted
-- `src/lib/uiConfig.ts` — theme switching logic deleted
-- All references to `NEXT_PUBLIC_UI_VERSION` — removed
-- Dev theme switcher UI — removed
+## Coaching Methodology
 
-## What Must Be Built
+| Framework | Used For | Structure |
+|-----------|----------|-----------|
+| IMPACT | Categorizing stories | I(ndividual) M(anage) P(ersuasion) A(nalytics) C(hallenge) T(eamwork) |
+| Stepping Stone | Structuring stories | Answer First → Actions → Tension → Resolution |
+| HERO | "Tell me about yourself" | Setup → Challenge → Turning Point → Resolution → Future Path |
+| CREI | "Why banking/firm/you" | Claim → Reason → Evidence → Impact |
+| STAR PUNCH | "Tell me about a time" | Situation → Task → Action → Result → Punchline |
+| ABCD | Weaknesses | Acknowledge → Bridge → Cover → Dangle |
+| TECH4 | Technical walkthroughs | Define → Components → Mechanics → Application |
 
-- `src/lib/llm.ts` — provider abstraction layer
-- `src/lib/supabase.ts` — Supabase client (browser + server)
-- `src/lib/storyState.ts` — storyState types, read/write/patch utilities
-- `src/components/AppShell.tsx` — Smoke + Cream shell with tabs, cream canvas, coach panel, bottom bar
-- `src/components/DecisionArc/` — React Flow graph, ArcNode, NodeDetail, ThreadEdge
-- `src/components/StoryBank/` — StoryCard, SteppingStone visual, CoverageTracker, TMAY builder, QuickReference
-- `src/components/CoachPanel.tsx` — contextual coach interface with prompt composer
-- `src/components/ResumePanel.tsx` — resume display with template compliance badge (adapt from existing)
-- `src/components/CoverLetter.tsx` — cover letter tab with target selector
-- `src/components/Targets.tsx` — target management and comparison
-- `src/app/api/generate-arc/route.ts` — draft Decision Arc from resume
+Coach persona: Sharp 2nd-year analyst friend. Direct, honest, not sycophantic.
 
 ---
 
 ## Interaction Patterns
 
 ### Click-to-zoom (Decision Arc)
-Clicking a node on the arc: the arc blurs/recedes, the node's full detail view takes over the cream canvas. Stepping Stone, +/- annotations, stories — all rendered large and breathable. Click blurred background or back button to return to arc view.
+Click node → arc blurs → node detail takes over cream canvas. Click blurred background to return.
 
 ### Everything is editable
-Every displayed piece of data is a view into storyState. Clicking any annotation, thread, or story stage can either inline-edit or invoke the coach with scoped context.
+Every displayed piece of data is a view into storyState. Clicking any annotation invokes coach or inline-edit.
 
 ### Coach prompt composer
-Every "develop with coach" or "ask about this" button constructs a scoped prompt:
-- Includes relevant storyState context (the specific node, story, or thread)
-- Includes relevant coaching methodology (Stepping Stone, IMPACT, CREI, etc.)
-- Does NOT dump the full storyState — only what's relevant to the interaction
-- The coach panel knows which tab is active and adjusts accordingly
+"Develop with coach" buttons construct scoped prompts with relevant storyState context + methodology. Never dumps full storyState.
 
 ### Protocol block flow
-Coach response → client parses protocol blocks → patches storyState → UI re-renders from storyState → Supabase write-back (debounced)
+Coach response → protocolParser → patch storyState → UI re-renders → Supabase write-back (debounced)
 
 ---
 
-## Coaching Methodology (for system prompt reference)
+## Supabase Schema
 
-The coach internalizes these frameworks without naming them to the user:
-
-| Framework | Used For | Structure |
-|-----------|----------|-----------|
-| IMPACT | Categorizing behavioral stories | I(ndividual) M(anage) P(ersuasion) A(nalytics) C(hallenge) T(eamwork) |
-| Stepping Stone | Structuring individual stories | Answer First → Actions → Tension → Resolution |
-| HERO | "Tell me about yourself" | Setup → Challenge → Turning Point → Resolution → Future Path |
-| CREI | "Why banking/firm/you" | Claim → Reason → Evidence → Impact |
-| STAR PUNCH | "Tell me about a time..." | Situation → Task → Action → Result → Punchline |
-| ABCD | Weaknesses | Acknowledge → Bridge → Cover → Dangle |
-| TECH4 | Technical walkthroughs | Define → Components → Mechanics → Application |
-
-The coach's persona: sharp 2nd-year analyst friend. Direct, honest, not sycophantic. Drives the conversation with an agenda. The resume is a filter, not a decision — networking is the decision. Be honest about this.
+Three tables with RLS: `profiles`, `story_states` (JSONB per user), `sessions` (event log).
+Auto-creates profile on signup via trigger. Full migration SQL in DIRECTION doc.
+**Not yet connected to any page.**
