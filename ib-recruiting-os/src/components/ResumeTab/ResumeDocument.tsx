@@ -1,15 +1,20 @@
 /**
  * ResumeDocument.tsx
  *
- * White-card resume renderer on cream canvas.
- * Clickable bullets, status dots, hover states, and LIVE PREVIEW
- * when a rewrite option is radio-selected in the workshop.
+ * White-card resume renderer mimicking a real IB resume PDF.
+ * Times New Roman body, bold companies, italic roles, right-aligned dates/locations.
+ * Clickable bullets with status dots, hover states, and LIVE PREVIEW.
  */
 
 "use client";
 
 import { useEffect, useRef, useMemo } from "react";
-import { enrichResumeLines, type EnrichedLine } from "@/lib/resumeStructure";
+import {
+  enrichResumeLines,
+  splitDateFromLine,
+  splitLocationFromLine,
+  type EnrichedLine,
+} from "@/lib/resumeStructure";
 import type { ResumeBullet } from "@/lib/resumeTypes";
 
 interface ResumeDocumentProps {
@@ -49,7 +54,6 @@ export default function ResumeDocument({
     }
   }, [workshopBulletId]);
 
-  // Map enriched lines to bullet data for status/preview
   function findBullet(el: EnrichedLine): ResumeBullet | undefined {
     if (el.type !== "bullet") return undefined;
     return bullets.find(
@@ -61,58 +65,101 @@ export default function ResumeDocument({
     <div
       ref={scrollContainerRef}
       className="scrollable h-full overflow-auto px-4 py-6"
-      style={{
-        transition: "all 250ms ease",
-      }}
     >
       {/* White card — paper on desk */}
       <div
-        className="mx-auto bg-white rounded-[10px] px-10 py-8"
+        className="resume-page mx-auto bg-white rounded-[10px]"
         style={{
           maxWidth: compressed ? "100%" : 680,
           boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
-          fontSize: compressed ? "90%" : "100%",
-          transition: "max-width 250ms ease, font-size 250ms ease",
+          padding: compressed ? "24px 20px" : "32px 40px",
+          fontFamily: "'Times New Roman', 'Georgia', serif",
+          fontSize: compressed ? "9pt" : "10pt",
+          lineHeight: 1.3,
+          color: "#1a1a1a",
+          transition: "max-width 250ms ease, padding 250ms ease, font-size 250ms ease",
         }}
       >
         {enrichedLines.map((el) => {
           const key = el.rawIndex;
           const trimmed = el.text.trim();
 
-          // Blank
+          // ── Blank line ──
           if (el.type === "blank") {
-            return <div key={key} className="h-2" />;
+            return <div key={key} className="h-1" />;
           }
 
-          // Section header
+          // ── Name (centered, bold, larger) ──
+          if (el.type === "name") {
+            return (
+              <p
+                key={key}
+                className="text-center font-bold tracking-wide"
+                style={{ fontSize: compressed ? "12pt" : "14pt", marginBottom: 2 }}
+              >
+                {trimmed}
+              </p>
+            );
+          }
+
+          // ── Contact info (centered, smaller, pipe-separated) ──
+          if (el.type === "contact") {
+            return (
+              <p
+                key={key}
+                className="text-center"
+                style={{ fontSize: compressed ? "8pt" : "9pt", color: "#444", marginBottom: 1 }}
+              >
+                {trimmed}
+              </p>
+            );
+          }
+
+          // ── Section header (bold, uppercase, with underline) ──
           if (el.type === "section-header") {
             return (
               <h2
                 key={key}
-                className="mt-4 mb-1.5 border-b border-cream-1 pb-0.5 text-[10pt] font-bold uppercase tracking-wide"
-                style={{ color: "#2a2826" }}
+                className="font-bold uppercase"
+                style={{
+                  fontSize: compressed ? "9pt" : "10pt",
+                  marginTop: 10,
+                  marginBottom: 3,
+                  paddingBottom: 2,
+                  borderBottom: "1px solid #999",
+                  letterSpacing: "0.5px",
+                }}
               >
                 {trimmed}
               </h2>
             );
           }
 
-          // Bullet — the interactive element
+          // ── Company line (bold, with location right-aligned if detected) ──
+          if (el.type === "company-line") {
+            return <EntryLine key={key} text={trimmed} bold />;
+          }
+
+          // ── Role line (italic, with dates right-aligned if detected) ──
+          if (el.type === "role-line") {
+            return <EntryLine key={key} text={trimmed} italic />;
+          }
+
+          // ── Bullet — the interactive element ──
           if (el.type === "bullet") {
             const bullet = findBullet(el);
+            const bulletText = trimmed.replace(/^[▪•\-·]\s*/, "");
+
             if (!bullet) {
               return (
-                <p key={key} className="mb-0.5 pl-4 text-[10pt] leading-snug" style={{ color: "#44403c" }}>
-                  {trimmed}
-                </p>
+                <BulletLine key={key} text={bulletText} />
               );
             }
 
             const isActive = bullet.id === workshopBulletId;
             const isPreview = isActive && previewText !== null;
-            const displayText = isPreview ? previewText : trimmed;
+            const displayText = isPreview ? previewText! : bulletText;
 
-            // Status dot color
             const dotColor =
               bullet.status === "rewritten"
                 ? "#22c55e"
@@ -120,77 +167,112 @@ export default function ResumeDocument({
                 ? "#d97706"
                 : undefined;
 
-            // Hover border color based on status
-            const hoverBorderColor =
-              bullet.status === "rewritten"
-                ? "hover:border-l-green-500"
-                : bullet.status === "reviewed"
-                ? "hover:border-l-amber-500"
-                : "hover:border-l-cream-1";
-
             return (
               <p
                 key={key}
                 ref={isActive ? activeBulletRef : undefined}
                 onClick={() => onBulletClick(bullet.id)}
-                className={`
-                  group relative mb-0.5 cursor-pointer pl-4 text-[10pt] leading-snug
-                  border-l-[3px] border-l-transparent
-                  transition-all duration-150
-                  ${hoverBorderColor}
-                  ${isActive ? "!border-l-terracotta" : ""}
-                `}
+                className="relative cursor-pointer transition-all duration-150"
                 style={{
-                  color: "#44403c",
+                  paddingLeft: 14,
+                  marginBottom: 2,
+                  borderLeft: isActive ? "3px solid #d4845a" : "3px solid transparent",
                   backgroundColor: isPreview
-                    ? "rgba(212, 132, 90, 0.03)"
+                    ? "rgba(212, 132, 90, 0.05)"
                     : isActive
-                    ? "rgba(212, 132, 90, 0.04)"
+                    ? "rgba(212, 132, 90, 0.03)"
                     : undefined,
-                  borderRadius: 4,
-                  padding: "2px 4px 2px 12px",
+                  borderRadius: 2,
+                  padding: "1px 4px 1px 14px",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) e.currentTarget.style.borderLeftColor = "#e8e4dc";
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) e.currentTarget.style.borderLeftColor = "transparent";
                 }}
               >
                 {/* Status dot */}
                 {dotColor && (
                   <span
-                    className="absolute left-0.5 top-1/2 -translate-y-1/2 rounded-full"
-                    style={{
-                      width: 4,
-                      height: 4,
-                      backgroundColor: dotColor,
-                    }}
+                    className="absolute top-[7px] left-[2px] rounded-full"
+                    style={{ width: 4, height: 4, backgroundColor: dotColor }}
                   />
                 )}
-                {isPreview ? (
-                  <span style={{ fontStyle: "italic" }}>{displayText}</span>
-                ) : (
-                  displayText
-                )}
+                {/* Bullet character */}
+                <span style={{ position: "absolute", left: 6 }}>&#8226;</span>
+                <span style={{ fontStyle: isPreview ? "italic" : undefined }}>
+                  {displayText}
+                </span>
               </p>
             );
           }
 
-          // Other lines — contact info, company/role, etc.
-          if (el.rawIndex === 0 || (el.rawIndex <= 2 && trimmed.length < 40)) {
-            return (
-              <p
-                key={key}
-                className={`text-center font-bold ${el.rawIndex === 0 ? "text-[14pt]" : "text-[10pt]"}`}
-                style={{ color: "#2a2826" }}
-              >
-                {trimmed}
-              </p>
-            );
-          }
-
+          // ── Other / fallback ──
           return (
-            <p key={key} className="mb-0.5 text-[10pt] leading-snug" style={{ color: "#44403c" }}>
+            <p key={key} style={{ marginBottom: 1 }}>
               {trimmed}
             </p>
           );
         })}
       </div>
     </div>
+  );
+}
+
+// ── Sub-components ───────────────────────────────────────────────────────────
+
+/**
+ * Renders a company or role line with right-aligned date/location detection.
+ * Bold for company, italic for role.
+ */
+function EntryLine({ text, bold, italic }: { text: string; bold?: boolean; italic?: boolean }) {
+  // Try to split date or location from the line
+  const dateSplit = splitDateFromLine(text);
+  const locSplit = splitLocationFromLine(text);
+
+  // Use whichever split works (date takes priority for role lines, location for company lines)
+  const split = bold ? (locSplit || dateSplit) : (dateSplit || locSplit);
+
+  if (split) {
+    const [left, right] = split;
+    return (
+      <p
+        className="flex justify-between items-baseline gap-2"
+        style={{
+          fontWeight: bold ? 700 : undefined,
+          fontStyle: italic ? "italic" : undefined,
+          marginBottom: 1,
+        }}
+      >
+        <span className="flex-1 min-w-0">{left}</span>
+        <span className="flex-shrink-0 text-right" style={{ fontStyle: italic ? "italic" : "normal" }}>
+          {right}
+        </span>
+      </p>
+    );
+  }
+
+  // No split found — render as-is
+  return (
+    <p
+      style={{
+        fontWeight: bold ? 700 : undefined,
+        fontStyle: italic ? "italic" : undefined,
+        marginBottom: 1,
+      }}
+    >
+      {text}
+    </p>
+  );
+}
+
+/** Non-interactive bullet (education bullets, skills, etc.) */
+function BulletLine({ text }: { text: string }) {
+  return (
+    <p style={{ paddingLeft: 14, marginBottom: 2, position: "relative" }}>
+      <span style={{ position: "absolute", left: 6 }}>&#8226;</span>
+      {text}
+    </p>
   );
 }
