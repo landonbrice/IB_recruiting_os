@@ -145,6 +145,24 @@ export default function ResumeDocument({
             return <EntryLine key={key} text={trimmed} italic />;
           }
 
+          // ── Sub-header (indented, not bold — "Selected Companies:", sub-entry names) ──
+          if (el.type === "sub-header") {
+            return (
+              <p
+                key={key}
+                style={{
+                  fontWeight: /:\s*$/.test(trimmed) ? 600 : 400,
+                  fontStyle: /:\s*$/.test(trimmed) ? undefined : "italic",
+                  marginTop: /:\s*$/.test(trimmed) ? 4 : 0,
+                  marginBottom: 1,
+                  paddingLeft: 4,
+                }}
+              >
+                {trimmed}
+              </p>
+            );
+          }
+
           // ── Bullet — the interactive element ──
           if (el.type === "bullet") {
             const bullet = findBullet(el);

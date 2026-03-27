@@ -9,7 +9,7 @@
 export interface EnrichedLine {
   text: string;
   rawIndex: number;
-  type: "blank" | "section-header" | "bullet" | "name" | "contact" | "company-line" | "role-line" | "other";
+  type: "blank" | "section-header" | "bullet" | "name" | "contact" | "company-line" | "role-line" | "sub-header" | "other";
   section: string;
   company: string;
   roleTitle: string;
@@ -28,7 +28,6 @@ export function normalizeResumeText(text: string): string {
   let lines = text.split("\n");
 
   // Pass 1: Rejoin broken ordinals/superscripts
-  // Pattern: line ends with a number, next line is "st", "nd", "rd", "th" (possibly with more text)
   const ordinalSuffix = /^(st|nd|rd|th)\b/i;
   const result: string[] = [];
 
@@ -36,10 +35,9 @@ export function normalizeResumeText(text: string): string {
     const line = lines[i];
     const next = lines[i + 1]?.trim() ?? "";
 
-    // Check if this line ends with a digit and next starts with ordinal suffix
     if (/\d\s*$/.test(line.trim()) && ordinalSuffix.test(next)) {
       result.push(line.trimEnd() + next);
-      i++; // skip the suffix line
+      i++;
       continue;
     }
 
@@ -48,9 +46,12 @@ export function normalizeResumeText(text: string): string {
 
   lines = result;
 
-  // Pass 2: Rejoin bullet continuation lines
-  // A continuation is a non-blank, non-bullet, non-header line that follows a bullet
-  // and starts with lowercase or is clearly a sentence fragment
+  // Pass 2: Rejoin continuation lines (after bullets OR after other continuations)
+  // A continuation is a non-blank, non-bullet, non-header line that:
+  // - starts with lowercase, OR
+  // - starts with a common continuation word, OR
+  // - is a short fragment
+  // AND the previous line was a bullet or already-continued bullet
   const rejoined: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
@@ -62,32 +63,21 @@ export function normalizeResumeText(text: string): string {
       continue;
     }
 
-    // If previous line was a bullet and this line is a continuation
     const prevIdx = rejoined.length - 1;
-    const prevLine = prevIdx >= 0 ? rejoined[prevIdx].trim() : "";
+    if (prevIdx < 0) {
+      rejoined.push(line);
+      continue;
+    }
+
+    const prevLine = rejoined[prevIdx].trim();
     const prevIsBullet = /^[▪•\-·]/.test(prevLine);
 
+    // Should this line be joined to the previous bullet?
     if (
       prevIsBullet &&
       !isResumeHeader(trimmed) &&
       !/^[▪•\-·]/.test(trimmed) &&
-      !isLikelyEntryLine(trimmed) &&
-      isContinuation(trimmed)
-    ) {
-      // Append to previous bullet
-      rejoined[prevIdx] = rejoined[prevIdx].trimEnd() + " " + trimmed;
-      continue;
-    }
-
-    // Also rejoin if previous was already a continuation-appended bullet
-    // and this line is still a continuation
-    if (
-      prevIdx >= 0 &&
-      /^[▪•\-·]/.test(rejoined[prevIdx].trim()) &&
-      !isResumeHeader(trimmed) &&
-      !/^[▪•\-·]/.test(trimmed) &&
-      !isLikelyEntryLine(trimmed) &&
-      isContinuation(trimmed)
+      isBulletContinuation(trimmed)
     ) {
       rejoined[prevIdx] = rejoined[prevIdx].trimEnd() + " " + trimmed;
       continue;
@@ -99,25 +89,19 @@ export function normalizeResumeText(text: string): string {
   return rejoined.join("\n");
 }
 
-/** Check if a line looks like a continuation (starts lowercase, or is a fragment) */
-function isContinuation(trimmed: string): boolean {
-  // Starts with lowercase letter — very likely a continuation
+/**
+ * Check if a line is a continuation of a bullet.
+ * More aggressive than general continuation — if a line follows a bullet
+ * and starts with lowercase or a continuation word, it's almost certainly
+ * part of the same bullet (PDF wrapped it).
+ */
+function isBulletContinuation(trimmed: string): boolean {
+  // Starts with lowercase — overwhelmingly a continuation
   if (/^[a-z]/.test(trimmed)) return true;
-  // Short fragment without ending punctuation that doesn't look like a header
-  if (trimmed.length < 30 && !/[.!?]$/.test(trimmed) && trimmed !== trimmed.toUpperCase()) return true;
-  // Starts with common continuation patterns
-  if (/^(and|or|with|for|to|in|of|the|a|an|by|from|at|on|into|through|including|consisting|using)\b/i.test(trimmed)) return true;
-  return false;
-}
-
-/** Check if a line looks like an experience entry line (company or role) */
-function isLikelyEntryLine(trimmed: string): boolean {
-  // Contains a date pattern
-  if (hasDatePattern(trimmed)) return true;
-  // Contains a city/state pattern
-  if (/[A-Z][a-z]+,\s*[A-Z]{2}\b/.test(trimmed)) return true;
-  // Looks like a company/org name (starts with capital, moderate length)
-  if (/^[A-Z][A-Za-z\s&''.,-]+$/.test(trimmed) && trimmed.length < 60 && trimmed.length > 5) return true;
+  // Starts with common continuation words (even capitalized after line break)
+  if (/^(and|or|with|for|to|in|of|the|a|an|by|from|at|on|into|through|including|consisting|using|ending|resulting|averaging|securing|retaining|collaborating|justifying|translating)\b/i.test(trimmed)) return true;
+  // Very short fragments that aren't headers or entry lines
+  if (trimmed.length < 20 && !/[A-Z]{2,}/.test(trimmed) && !hasDatePattern(trimmed)) return true;
   return false;
 }
 
@@ -143,17 +127,11 @@ function hasDatePattern(text: string): boolean {
 
 /**
  * Try to split a line into left part and date part.
- * Returns [leftText, dateText] or null if no date found.
- * Handles: "Company Name  Summer 2025", "Title  Spring 2022 – Spring 2024"
  */
 function splitDateFromLine(text: string): [string, string] | null {
-  // Match date patterns at the end of the line
   const datePatterns = [
-    // "Summer 2025", "Fall 2024 – Present", "Spring 2022 – Spring 2024"
     /\s{2,}((Spring|Summer|Fall|Winter|January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}(?:\s*[-–—]\s*(?:Present|\d{4}|(?:Spring|Summer|Fall|Winter|January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}))?)$/i,
-    // "Expected Spring 2028", "Expected 2028"
     /\s{2,}(Expected\s+(?:(?:Spring|Summer|Fall|Winter)\s+)?\d{4})$/i,
-    // Just a year range at end: "2022 – 2024"
     /\s{2,}(\d{4}\s*[-–—]\s*(?:Present|\d{4}))$/i,
   ];
 
@@ -165,11 +143,18 @@ function splitDateFromLine(text: string): [string, string] | null {
     }
   }
 
-  // Also try single space separator if the date is clearly at the end
   const simpleDate = text.match(/\s((?:Spring|Summer|Fall|Winter|Expected)\s+\d{4}(?:\s*[-–—]\s*(?:Present|\d{4}))?)$/i);
   if (simpleDate) {
     const dateStart = text.lastIndexOf(simpleDate[1]);
     return [text.slice(0, dateStart).trim(), simpleDate[1].trim()];
+  }
+
+  // September 2025 – Present (month name with single space)
+  const monthDate = text.match(/\s((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}(?:\s*[-–—]\s*(?:Present|\d{4}))?)$/i);
+  if (monthDate) {
+    const dateStart = text.lastIndexOf(monthDate[1]);
+    const left = text.slice(0, dateStart).trim();
+    if (left.length > 5) return [left, monthDate[1].trim()];
   }
 
   return null;
@@ -177,11 +162,9 @@ function splitDateFromLine(text: string): [string, string] | null {
 
 /**
  * Try to split a line into left part and location part.
- * Returns [leftText, locationText] or null if no location found.
- * Handles: "Company Name  City, ST", "University  Chicago, IL"
  */
 function splitLocationFromLine(text: string): [string, string] | null {
-  // Match "City, ST" or "City, State" at end with multi-space separator
+  // Match "City, ST" at end with multi-space separator
   const match = text.match(/\s{2,}([A-Z][a-zA-Z\s.]+,\s*[A-Z]{2})\s*$/);
   if (match) {
     const locStart = text.lastIndexOf(match[1]);
@@ -193,19 +176,54 @@ function splitLocationFromLine(text: string): [string, string] | null {
   if (simpleMatch) {
     const locStart = text.lastIndexOf(simpleMatch[1]);
     const left = text.slice(0, locStart).trim();
-    // Only split if left side is substantial
-    if (left.length > 10) {
-      return [left, simpleMatch[1].trim()];
-    }
+    if (left.length > 10) return [left, simpleMatch[1].trim()];
   }
 
   return null;
 }
 
+// ── Smart Entry Detection ────────────────────────────────────────────────────
+
+/**
+ * Determine if a non-bullet line after bullets is actually a new company/entry
+ * vs. a sub-header, continuation, or other non-structural text.
+ *
+ * A real company/entry line typically:
+ * - Contains a location (City, ST) or date
+ * - Is short-to-moderate length (not a full sentence)
+ * - Doesn't end with sentence-like punctuation
+ * - Doesn't start with lowercase
+ */
+function isNewEntryLine(trimmed: string): boolean {
+  // Contains City, ST pattern — very likely an entry line
+  if (/[A-Z][a-z]+,\s*[A-Z]{2}\b/.test(trimmed)) return true;
+  // Contains a date pattern — very likely an entry line
+  if (hasDatePattern(trimmed)) return true;
+  // Short capitalized line that looks like an org name (no sentence punctuation)
+  if (
+    trimmed.length < 50 &&
+    /^[A-Z]/.test(trimmed) &&
+    !/[.!?;]$/.test(trimmed) &&
+    !/^(and|or|with|for|to|in|of|the|by|from|at|on)\b/i.test(trimmed)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Detect sub-headers like "Selected Companies:", "Brand Properties", etc.
+ * These are indented sub-entries under a parent company (e.g., IDP program).
+ */
+function isSubHeader(trimmed: string): boolean {
+  // Ends with colon — "Selected Companies:"
+  if (/:\s*$/.test(trimmed)) return true;
+  return false;
+}
+
 // ── Line Enrichment ──────────────────────────────────────────────────────────
 
 export function enrichResumeLines(text: string): EnrichedLine[] {
-  // Normalize first to fix PDF artifacts
   const normalized = normalizeResumeText(text);
   const raw = normalized.split("\n");
   const result: EnrichedLine[] = [];
@@ -215,7 +233,7 @@ export function enrichResumeLines(text: string): EnrichedLine[] {
   let currentRoleTitle = "";
   let bulletIndexInCompany = 0;
   let lastWasBullet = false;
-  let lineCount = 0; // count non-blank lines for name/contact detection
+  let lineCount = 0;
 
   for (let i = 0; i < raw.length; i++) {
     const line = raw[i];
@@ -223,13 +241,9 @@ export function enrichResumeLines(text: string): EnrichedLine[] {
 
     if (!trimmed) {
       result.push({
-        text: line,
-        rawIndex: i,
-        type: "blank",
-        section: currentSection,
-        company: currentCompany,
-        roleTitle: currentRoleTitle,
-        bulletIndex: -1,
+        text: line, rawIndex: i, type: "blank",
+        section: currentSection, company: currentCompany,
+        roleTitle: currentRoleTitle, bulletIndex: -1,
       });
       lastWasBullet = false;
       continue;
@@ -237,31 +251,21 @@ export function enrichResumeLines(text: string): EnrichedLine[] {
 
     lineCount++;
 
-    // Name (first non-blank line, typically centered, often all-caps or Title Case)
+    // Name (first non-blank line)
     if (lineCount === 1 && !currentSection) {
       result.push({
-        text: trimmed,
-        rawIndex: i,
-        type: "name",
-        section: "",
-        company: "",
-        roleTitle: "",
-        bulletIndex: -1,
+        text: trimmed, rawIndex: i, type: "name",
+        section: "", company: "", roleTitle: "", bulletIndex: -1,
       });
       lastWasBullet = false;
       continue;
     }
 
-    // Contact info (lines 2-3 before first section, contain email/phone/address)
+    // Contact info (lines 2-3 before first section)
     if (lineCount <= 3 && !currentSection && isContactLine(trimmed)) {
       result.push({
-        text: trimmed,
-        rawIndex: i,
-        type: "contact",
-        section: "",
-        company: "",
-        roleTitle: "",
-        bulletIndex: -1,
+        text: trimmed, rawIndex: i, type: "contact",
+        section: "", company: "", roleTitle: "", bulletIndex: -1,
       });
       lastWasBullet = false;
       continue;
@@ -275,13 +279,8 @@ export function enrichResumeLines(text: string): EnrichedLine[] {
       bulletIndexInCompany = 0;
       lastWasBullet = false;
       result.push({
-        text: trimmed,
-        rawIndex: i,
-        type: "section-header",
-        section: currentSection,
-        company: "",
-        roleTitle: "",
-        bulletIndex: -1,
+        text: trimmed, rawIndex: i, type: "section-header",
+        section: currentSection, company: "", roleTitle: "", bulletIndex: -1,
       });
       continue;
     }
@@ -290,94 +289,91 @@ export function enrichResumeLines(text: string): EnrichedLine[] {
     if (/^[▪•\-·]/.test(trimmed)) {
       if (!lastWasBullet) bulletIndexInCompany = 0;
       result.push({
-        text: trimmed,
-        rawIndex: i,
-        type: "bullet",
-        section: currentSection,
-        company: currentCompany,
-        roleTitle: currentRoleTitle,
-        bulletIndex: bulletIndexInCompany,
+        text: trimmed, rawIndex: i, type: "bullet",
+        section: currentSection, company: currentCompany,
+        roleTitle: currentRoleTitle, bulletIndex: bulletIndexInCompany,
       });
       bulletIndexInCompany++;
       lastWasBullet = true;
       continue;
     }
 
-    // Non-bullet lines in a section: company or role
-    if (currentSection && !lastWasBullet) {
+    // ── Non-bullet lines after bullets ──
+    // This is where the tricky cases live. Not every line after bullets is a new company.
+    if (currentSection && lastWasBullet) {
+      // Sub-header like "Selected Companies:"
+      if (isSubHeader(trimmed)) {
+        result.push({
+          text: trimmed, rawIndex: i, type: "sub-header",
+          section: currentSection, company: currentCompany,
+          roleTitle: currentRoleTitle, bulletIndex: -1,
+        });
+        lastWasBullet = false;
+        continue;
+      }
+
+      // Looks like a real new entry (has location, date, or is a short org name)
+      if (isNewEntryLine(trimmed)) {
+        currentCompany = trimmed;
+        currentRoleTitle = "";
+        bulletIndexInCompany = 0;
+        result.push({
+          text: trimmed, rawIndex: i, type: "company-line",
+          section: currentSection, company: currentCompany,
+          roleTitle: "", bulletIndex: -1,
+        });
+        lastWasBullet = false;
+        continue;
+      }
+
+      // Otherwise it's probably a sub-entry name (like "Brand Properties" under IDP)
+      // or a descriptive line — render as sub-header (not bold company)
+      result.push({
+        text: trimmed, rawIndex: i, type: "sub-header",
+        section: currentSection, company: currentCompany,
+        roleTitle: currentRoleTitle, bulletIndex: -1,
+      });
+      lastWasBullet = false;
+      continue;
+    }
+
+    // ── Non-bullet lines NOT after bullets (company/role detection) ──
+    if (currentSection) {
       if (!currentCompany) {
         currentCompany = trimmed;
         bulletIndexInCompany = 0;
         result.push({
-          text: trimmed,
-          rawIndex: i,
-          type: "company-line",
-          section: currentSection,
-          company: currentCompany,
-          roleTitle: "",
-          bulletIndex: -1,
+          text: trimmed, rawIndex: i, type: "company-line",
+          section: currentSection, company: currentCompany,
+          roleTitle: "", bulletIndex: -1,
         });
-        lastWasBullet = false;
-        continue;
       } else if (!currentRoleTitle) {
         currentRoleTitle = trimmed;
         result.push({
-          text: trimmed,
-          rawIndex: i,
-          type: "role-line",
-          section: currentSection,
-          company: currentCompany,
-          roleTitle: currentRoleTitle,
-          bulletIndex: -1,
+          text: trimmed, rawIndex: i, type: "role-line",
+          section: currentSection, company: currentCompany,
+          roleTitle: currentRoleTitle, bulletIndex: -1,
         });
-        lastWasBullet = false;
-        continue;
       } else {
         // New company
         currentCompany = trimmed;
         currentRoleTitle = "";
         bulletIndexInCompany = 0;
         result.push({
-          text: trimmed,
-          rawIndex: i,
-          type: "company-line",
-          section: currentSection,
-          company: currentCompany,
-          roleTitle: "",
-          bulletIndex: -1,
+          text: trimmed, rawIndex: i, type: "company-line",
+          section: currentSection, company: currentCompany,
+          roleTitle: "", bulletIndex: -1,
         });
-        lastWasBullet = false;
-        continue;
       }
-    }
-
-    // After bullets, a non-bullet line is likely a new company
-    if (currentSection && lastWasBullet) {
-      currentCompany = trimmed;
-      currentRoleTitle = "";
-      bulletIndexInCompany = 0;
-      result.push({
-        text: trimmed,
-        rawIndex: i,
-        type: "company-line",
-        section: currentSection,
-        company: currentCompany,
-        roleTitle: "",
-        bulletIndex: -1,
-      });
       lastWasBullet = false;
       continue;
     }
 
     // Fallback
     result.push({
-      text: trimmed,
-      rawIndex: i,
-      type: "other",
-      section: currentSection,
-      company: currentCompany,
-      roleTitle: currentRoleTitle,
-      bulletIndex: -1,
+      text: trimmed, rawIndex: i, type: "other",
+      section: currentSection, company: currentCompany,
+      roleTitle: currentRoleTitle, bulletIndex: -1,
     });
     lastWasBullet = false;
   }
@@ -389,5 +385,4 @@ function isContactLine(text: string): boolean {
   return /(@|\.edu|\.com|\.org|\d{3}[-.)]\s?\d{3}|\|)/.test(text);
 }
 
-// Export split helpers for use in rendering
 export { splitDateFromLine, splitLocationFromLine };
