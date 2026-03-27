@@ -24,12 +24,16 @@ interface ResumeTabProps {
 export default function ResumeTab({ session, onHideCoach }: ResumeTabProps) {
   const {
     currentResumeText,
+    resumeText,
     candidateProfile,
     handleApplyBullet,
   } = session;
 
+  // Use currentResumeText (with edits) if available, fall back to original resumeText
+  const displayText = currentResumeText ?? resumeText;
+
   const workshop = useResumeWorkshop({
-    currentResumeText,
+    currentResumeText: displayText,
     candidateProfile,
     onApplyBullet: handleApplyBullet,
   });
@@ -72,7 +76,7 @@ export default function ResumeTab({ session, onHideCoach }: ResumeTabProps) {
     : { current: 0, total: 0 };
 
   // No resume uploaded yet
-  if (!currentResumeText) {
+  if (!displayText) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
@@ -99,7 +103,7 @@ export default function ResumeTab({ session, onHideCoach }: ResumeTabProps) {
         }}
       >
         <ResumeDocument
-          resumeText={currentResumeText}
+          resumeText={displayText}
           bullets={bullets}
           compressed={isWorkshopOpen}
           workshopBulletId={workshopBulletId}

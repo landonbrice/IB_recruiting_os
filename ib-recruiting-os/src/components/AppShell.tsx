@@ -43,12 +43,13 @@ export default function AppShell() {
 
   // Auto-switch to Resume tab when resume data first becomes available
   const hasAutoSwitched = useRef(false);
+  const resumeAvailable = session.currentResumeText || session.resumeText;
   useEffect(() => {
-    if (session.currentResumeText && !hasAutoSwitched.current) {
+    if (resumeAvailable && !hasAutoSwitched.current) {
       hasAutoSwitched.current = true;
       setActiveTab("resume");
     }
-  }, [session.currentResumeText]);
+  }, [resumeAvailable]);
 
   const handleHideCoach = useCallback((hide: boolean) => {
     setHideCoach(hide);
