@@ -11,17 +11,17 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useCoachSession } from "@/hooks/useCoachSession";
+import type { CoachSession } from "@/hooks/useCoachSession";
 import { useResumeWorkshop } from "@/hooks/useResumeWorkshop";
 import ResumeDocument from "./ResumeDocument";
 import BulletWorkshop from "./BulletWorkshop";
 
 interface ResumeTabProps {
+  session: CoachSession;
   onHideCoach: (hide: boolean) => void;
 }
 
-export default function ResumeTab({ onHideCoach }: ResumeTabProps) {
-  const session = useCoachSession();
+export default function ResumeTab({ session, onHideCoach }: ResumeTabProps) {
   const {
     currentResumeText,
     candidateProfile,

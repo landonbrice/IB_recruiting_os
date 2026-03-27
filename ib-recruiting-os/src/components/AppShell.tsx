@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import NavBar, { type TabId } from "@/components/NavBar";
 import CoachPanel from "@/components/CoachPanel";
 import BottomBar from "@/components/BottomBar";
 import DecisionArc from "@/components/DecisionArc";
 import StoryBank from "@/components/StoryBank";
 import ResumeTab from "@/components/ResumeTab";
+import { useCoachSession } from "@/hooks/useCoachSession";
 
 const TAB_LABELS: Record<TabId, string> = {
   resume: "Resume",
@@ -36,6 +37,19 @@ export default function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>("arc");
   const [hideCoach, setHideCoach] = useState(false);
 
+  // Lift session to AppShell so it restores from sessionStorage on mount
+  // regardless of which tab is active. Pass down to ResumeTab.
+  const session = useCoachSession();
+
+  // Auto-switch to Resume tab when resume data first becomes available
+  const hasAutoSwitched = useRef(false);
+  useEffect(() => {
+    if (session.currentResumeText && !hasAutoSwitched.current) {
+      hasAutoSwitched.current = true;
+      setActiveTab("resume");
+    }
+  }, [session.currentResumeText]);
+
   const handleHideCoach = useCallback((hide: boolean) => {
     setHideCoach(hide);
   }, []);
@@ -50,7 +64,9 @@ export default function AppShell() {
         {/* Cream Canvas */}
         <div className="flex-1 p-[10px]">
           <div className="relative flex h-full flex-col overflow-auto rounded-[10px] bg-cream">
-            {activeTab === "resume" && <ResumeTab onHideCoach={handleHideCoach} />}
+            {activeTab === "resume" && (
+              <ResumeTab session={session} onHideCoach={handleHideCoach} />
+            )}
             {activeTab === "arc" && <DecisionArc />}
             {activeTab === "stories" && <StoryBank />}
             {activeTab !== "resume" && activeTab !== "arc" && activeTab !== "stories" && (

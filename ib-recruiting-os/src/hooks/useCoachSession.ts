@@ -137,6 +137,8 @@ function applyUpdate(text: string, update: ResumeUpdate): string {
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
+export type CoachSession = ReturnType<typeof useCoachSession>;
+
 export function useCoachSession() {
   const [resumeText, setResumeText] = useState<string | null>(null);
   const [currentResumeText, setCurrentResumeText] = useState<string | null>(null);
