@@ -57,6 +57,28 @@ export default function AppShell() {
 
   const showCoach = !(hideCoach && activeTab === "resume");
 
+  // Route bottom bar actions to session methods
+  const handleBottomBarAction = useCallback((action: string) => {
+    switch (action) {
+      case "Score resume":
+        session.handleRequestScore();
+        break;
+      case "Check verbs":
+        session.handleAction("Scan my resume for weak verbs and suggest replacements");
+        break;
+      case "Export":
+        // TODO: wire export modal
+        break;
+      case "Template check":
+        session.handleAction("Check my resume against IB template compliance standards");
+        break;
+      default:
+        // For unhandled actions, send as coach message
+        session.handleAction(action);
+        break;
+    }
+  }, [session]);
+
   return (
     <div className="flex h-full w-full flex-col">
       <NavBar activeTab={activeTab} onTabChange={setActiveTab} />
@@ -90,7 +112,7 @@ export default function AppShell() {
         </div>
       </div>
 
-      <BottomBar activeTab={activeTab} />
+      <BottomBar activeTab={activeTab} onAction={handleBottomBarAction} />
     </div>
   );
 }

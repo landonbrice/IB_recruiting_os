@@ -225,12 +225,18 @@ function applySingleUpdate(state: StoryState, update: StateUpdate): StoryState {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function stripKnownBlocks(text: string): string {
-  return text
-    .replace(/```coach-response[\s\S]*?```/g, "")
-    .replace(/```resume-update[\s\S]*?```/g, "")
-    .replace(/```resume-score[\s\S]*?```/g, "")
-    .replace(/```profile-update[\s\S]*?```/g, "")
-    .replace(/```cover-letter[\s\S]*?```/g, "")
-    .replace(/```feasibility-score[\s\S]*?```/g, "")
-    .trim();
+  const blockTypes = [
+    "coach-response", "resume-update", "resume-score",
+    "profile-update", "cover-letter", "feasibility-score",
+  ];
+  let result = text;
+  for (const bt of blockTypes) {
+    // Strip complete fenced blocks
+    result = result.replace(new RegExp("```" + bt + "[\\s\\S]*?```", "g"), "");
+    // Strip incomplete/unclosed fenced blocks (LLM didn't close the fence)
+    result = result.replace(new RegExp("```" + bt + "[\\s\\S]*$", "g"), "");
+  }
+  // Strip any remaining orphan JSON blocks that look like protocol output
+  result = result.replace(/```\s*\{[\s\S]*$/g, "");
+  return result.trim();
 }

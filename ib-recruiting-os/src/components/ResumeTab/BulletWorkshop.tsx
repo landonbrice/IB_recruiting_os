@@ -244,9 +244,9 @@ export default function BulletWorkshop({
                 </p>
               )}
 
-              {bullet.coachThread.map((msg, i) => (
+              {bullet.coachThread.map((msg) => (
                 <CoachThreadMessage
-                  key={i}
+                  key={`${msg.timestamp}-${msg.role}`}
                   msg={msg}
                   onAddRewrite={onAddCoachRewrite}
                 />

@@ -6,15 +6,17 @@
  * - Workshop: compressed resume (40%) + BulletWorkshop (60%), coach panel hidden
  *
  * Wires useCoachSession (resume data) with useResumeWorkshop (workshop state).
+ * Includes floating score badge when resume score is available.
  */
 
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CoachSession } from "@/hooks/useCoachSession";
 import { useResumeWorkshop } from "@/hooks/useResumeWorkshop";
 import ResumeDocument from "./ResumeDocument";
 import BulletWorkshop from "./BulletWorkshop";
+import ScoreCard from "@/components/ScoreCard";
 
 interface ResumeTabProps {
   session: CoachSession;
@@ -26,8 +28,11 @@ export default function ResumeTab({ session, onHideCoach }: ResumeTabProps) {
     currentResumeText,
     resumeText,
     candidateProfile,
+    resumeScore,
     handleApplyBullet,
   } = session;
+
+  const [showScoreCard, setShowScoreCard] = useState(false);
 
   // Use currentResumeText (with edits) if available, fall back to original resumeText
   const displayText = currentResumeText ?? resumeText;
@@ -92,7 +97,7 @@ export default function ResumeTab({ session, onHideCoach }: ResumeTabProps) {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="relative flex h-full overflow-hidden">
       {/* Resume Document */}
       <div
         style={{
@@ -139,6 +144,78 @@ export default function ResumeTab({ session, onHideCoach }: ResumeTabProps) {
           />
         )}
       </div>
+
+      {/* Floating Score Badge */}
+      {resumeScore && !isWorkshopOpen && (
+        <div className="absolute top-4 right-4 z-10">
+          <button
+            onClick={() => setShowScoreCard((v) => !v)}
+            className="flex items-center gap-2 rounded-[10px] bg-white px-3 py-2 transition-all hover:shadow-md"
+            style={{
+              boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+              border: "1px solid #e8e4dc",
+            }}
+          >
+            <ScoreRing score={resumeScore.total} size={32} />
+            <div className="text-left">
+              <p className="text-[10px] font-semibold" style={{ color: "#44403c" }}>
+                {resumeScore.total}/100
+              </p>
+              <p className="text-[8px]" style={{ color: "#a8a29e" }}>
+                {showScoreCard ? "Hide details" : "View details"}
+              </p>
+            </div>
+          </button>
+
+          {/* Expanded ScoreCard dropdown (dark bg to match ScoreCard's stone theme) */}
+          {showScoreCard && (
+            <div
+              className="mt-2 rounded-[10px] overflow-auto"
+              style={{
+                boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+                backgroundColor: "#1c1917",
+                maxHeight: 400,
+                width: 320,
+              }}
+            >
+              <ScoreCard score={resumeScore} />
+            </div>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+/** Mini circular score ring for the floating badge */
+function ScoreRing({ score, size }: { score: number; size: number }) {
+  const radius = (size - 4) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+  const color = score >= 80 ? "#22c55e" : score >= 60 ? "#d97706" : "#ef4444";
+
+  return (
+    <svg width={size} height={size} className="flex-shrink-0">
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="#e8e4dc"
+        strokeWidth={2.5}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+    </svg>
   );
 }

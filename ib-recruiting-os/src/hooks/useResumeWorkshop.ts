@@ -272,46 +272,44 @@ export function useResumeWorkshop({
   );
 
   // ── Bullet-scoped coach chat ────────────────────────────────────────────
+  const streamingContentRef = useRef("");
+  const streamingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const sendBulletChat = useCallback(
     async (content: string) => {
       if (!activeBullet || !currentResumeText) return;
 
-      // Add user message to thread
-      const userMsg: BulletCoachMessage = {
-        role: "user",
-        content,
-        timestamp: Date.now(),
-      };
+      const bulletId = activeBullet.id;
+      const userTimestamp = Date.now();
+      const assistantTimestamp = userTimestamp + 1; // ensure unique
+
+      // Build the thread BEFORE any state updates (avoid stale closure)
+      const threadForApi = [
+        ...activeBullet.coachThread.map((m) => ({ role: m.role, content: m.content })),
+        { role: "user" as const, content },
+      ];
+
+      // Add user message + placeholder assistant message in one setState
+      const userMsg: BulletCoachMessage = { role: "user", content, timestamp: userTimestamp };
+      const placeholderMsg: BulletCoachMessage = { role: "assistant", content: "", timestamp: assistantTimestamp };
+
       setBullets((prev) =>
         prev.map((b) =>
-          b.id === activeBullet.id
-            ? { ...b, coachThread: [...b.coachThread, userMsg], status: b.status === "untouched" ? "reviewed" : b.status }
+          b.id === bulletId
+            ? {
+                ...b,
+                coachThread: [...b.coachThread, userMsg, placeholderMsg],
+                status: b.status === "untouched" ? "reviewed" as const : b.status,
+              }
             : b
         )
       );
 
       setIsWorkshopStreaming(true);
       abortRef.current = new AbortController();
-      let accumulated = "";
-
-      // Add placeholder assistant message
-      const placeholderId = Date.now();
-      setBullets((prev) =>
-        prev.map((b) =>
-          b.id === activeBullet.id
-            ? {
-                ...b,
-                coachThread: [
-                  ...b.coachThread,
-                  { role: "assistant" as const, content: "", timestamp: placeholderId },
-                ],
-              }
-            : b
-        )
-      );
+      streamingContentRef.current = "";
 
       try {
-        const thread = [...activeBullet.coachThread, userMsg];
         const res = await fetch("/api/chat/bullet", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -323,7 +321,7 @@ export function useResumeWorkshop({
               roleTitle: activeBullet.roleTitle,
               section: activeBullet.section,
             },
-            thread: thread.map((m) => ({ role: m.role, content: m.content })),
+            thread: threadForApi,
             resumeText: currentResumeText,
             candidateProfile,
           }),
@@ -332,45 +330,56 @@ export function useResumeWorkshop({
 
         if (!res.ok || !res.body) throw new Error("Bullet chat stream failed");
 
+        // Throttled streaming: update state every 80ms instead of every delta
         await consumeSSE(res.body, (text) => {
-          accumulated += text;
-          // Update the placeholder message with streaming content
-          setBullets((prev) =>
-            prev.map((b) =>
-              b.id === activeBullet.id
-                ? {
-                    ...b,
-                    coachThread: b.coachThread.map((m) =>
-                      m.timestamp === placeholderId ? { ...m, content: accumulated } : m
-                    ),
-                  }
-                : b
-            )
-          );
+          streamingContentRef.current += text;
+          if (!streamingTimerRef.current) {
+            streamingTimerRef.current = setTimeout(() => {
+              streamingTimerRef.current = null;
+              const snapshot = streamingContentRef.current;
+              setBullets((prev) =>
+                prev.map((b) =>
+                  b.id === bulletId
+                    ? {
+                        ...b,
+                        coachThread: b.coachThread.map((m) =>
+                          m.timestamp === assistantTimestamp ? { ...m, content: snapshot } : m
+                        ),
+                      }
+                    : b
+                )
+              );
+            }, 80);
+          }
         });
 
-        // Parse the completed response
-        const parsed = parseCoachResponse(accumulated);
+        // Clear any pending timer
+        if (streamingTimerRef.current) {
+          clearTimeout(streamingTimerRef.current);
+          streamingTimerRef.current = null;
+        }
 
-        // Update the final message with parsed content
+        // Parse the completed response
+        const parsed = parseCoachResponse(streamingContentRef.current);
+
+        // Final update: replace placeholder with parsed content
         const finalMsg: BulletCoachMessage = {
           role: "assistant",
           content: parsed.message,
           rewriteSuggestion: parsed.rewriteSuggestion,
           stateUpdates: parsed.stateUpdates.length > 0 ? parsed.stateUpdates : undefined,
-          timestamp: placeholderId,
+          timestamp: assistantTimestamp,
         };
 
         setBullets((prev) =>
           prev.map((b) => {
-            if (b.id !== activeBullet.id) return b;
+            if (b.id !== bulletId) return b;
             const updated = {
               ...b,
               coachThread: b.coachThread.map((m) =>
-                m.timestamp === placeholderId ? finalMsg : m
+                m.timestamp === assistantTimestamp ? finalMsg : m
               ),
             };
-            // If coach suggested a rewrite, add it as an option
             if (parsed.rewriteSuggestion) {
               updated.rewrites = [
                 ...updated.rewrites,
@@ -394,14 +403,13 @@ export function useResumeWorkshop({
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
           console.error("Bullet chat failed:", err);
-          // Update placeholder with error
           setBullets((prev) =>
             prev.map((b) =>
-              b.id === activeBullet.id
+              b.id === bulletId
                 ? {
                     ...b,
                     coachThread: b.coachThread.map((m) =>
-                      m.timestamp === placeholderId
+                      m.timestamp === assistantTimestamp
                         ? { ...m, content: "Something went wrong. Please try again." }
                         : m
                     ),
@@ -412,6 +420,7 @@ export function useResumeWorkshop({
         }
       } finally {
         setIsWorkshopStreaming(false);
+        streamingContentRef.current = "";
       }
     },
     [activeBullet, currentResumeText, candidateProfile, storyState, onStoryStateUpdate]

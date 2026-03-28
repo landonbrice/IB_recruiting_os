@@ -12,9 +12,10 @@ const TAB_ACTIONS: Record<TabId, string[]> = {
 
 interface BottomBarProps {
   activeTab: TabId;
+  onAction?: (action: string) => void;
 }
 
-export default function BottomBar({ activeTab }: BottomBarProps) {
+export default function BottomBar({ activeTab, onAction }: BottomBarProps) {
   const actions = TAB_ACTIONS[activeTab];
 
   return (
@@ -23,6 +24,7 @@ export default function BottomBar({ activeTab }: BottomBarProps) {
         {actions.map((label) => (
           <button
             key={label}
+            onClick={() => onAction?.(label)}
             className="rounded-[5px] border border-white/[0.12] bg-transparent px-2.5 py-1 text-[10px] text-cream/50 transition-all duration-150 hover:border-white/[0.18] hover:text-cream/70"
           >
             {label}
