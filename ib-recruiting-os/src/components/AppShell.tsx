@@ -7,7 +7,13 @@ import BottomBar from "@/components/BottomBar";
 import DecisionArc from "@/components/DecisionArc";
 import StoryBank from "@/components/StoryBank";
 import ResumeTab from "@/components/ResumeTab";
+import ExportModal from "@/components/ExportModal";
 import { useCoachSession } from "@/hooks/useCoachSession";
+
+const TAB_DESCRIPTIONS: Partial<Record<TabId, string>> = {
+  cover: "Coming soon",
+  targets: "Coming soon",
+};
 
 const TAB_LABELS: Record<TabId, string> = {
   resume: "Resume",
@@ -15,11 +21,6 @@ const TAB_LABELS: Record<TabId, string> = {
   stories: "Story Bank",
   cover: "Cover Letter",
   targets: "Targets",
-};
-
-const TAB_DESCRIPTIONS: Partial<Record<TabId, string>> = {
-  cover: "Coming soon",
-  targets: "Coming soon",
 };
 
 function TabPlaceholder({ tab }: { tab: TabId }) {
@@ -36,9 +37,9 @@ function TabPlaceholder({ tab }: { tab: TabId }) {
 export default function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>("arc");
   const [hideCoach, setHideCoach] = useState(false);
+  const [verbHighlightMode, setVerbHighlightMode] = useState(false);
+  const [showExport, setShowExport] = useState(false);
 
-  // Lift session to AppShell so it restores from sessionStorage on mount
-  // regardless of which tab is active. Pass down to ResumeTab.
   const session = useCoachSession();
 
   // Auto-switch to Resume tab when resume data first becomes available
@@ -57,23 +58,27 @@ export default function AppShell() {
 
   const showCoach = !(hideCoach && activeTab === "resume");
 
-  // Route bottom bar actions to session methods
+  // Turn off verb highlight when leaving resume tab
+  useEffect(() => {
+    if (activeTab !== "resume") setVerbHighlightMode(false);
+  }, [activeTab]);
+
+  // Route bottom bar actions
   const handleBottomBarAction = useCallback((action: string) => {
     switch (action) {
       case "Score resume":
         session.handleRequestScore();
         break;
       case "Check verbs":
-        session.handleAction("Scan my resume for weak verbs and suggest replacements");
+        setVerbHighlightMode((v) => !v);
         break;
       case "Export":
-        // TODO: wire export modal
+        setShowExport(true);
         break;
       case "Template check":
         session.handleAction("Check my resume against IB template compliance standards");
         break;
       default:
-        // For unhandled actions, send as coach message
         session.handleAction(action);
         break;
     }
@@ -88,7 +93,11 @@ export default function AppShell() {
         <div className="flex-1 p-[10px]">
           <div className="relative flex h-full flex-col overflow-auto rounded-[10px] bg-cream">
             {activeTab === "resume" && (
-              <ResumeTab session={session} onHideCoach={handleHideCoach} />
+              <ResumeTab
+                session={session}
+                onHideCoach={handleHideCoach}
+                verbHighlightMode={verbHighlightMode}
+              />
             )}
             {activeTab === "arc" && <DecisionArc />}
             {activeTab === "stories" && <StoryBank />}
@@ -108,11 +117,21 @@ export default function AppShell() {
             flexShrink: 0,
           }}
         >
-          <CoachPanel />
+          <CoachPanel session={session} />
         </div>
       </div>
 
       <BottomBar activeTab={activeTab} onAction={handleBottomBarAction} />
+
+      {/* Export Modal */}
+      {showExport && (
+        <ExportModal
+          currentResumeText={session.currentResumeText}
+          messages={session.messages}
+          resumeScore={session.resumeScore}
+          onClose={() => setShowExport(false)}
+        />
+      )}
     </div>
   );
 }

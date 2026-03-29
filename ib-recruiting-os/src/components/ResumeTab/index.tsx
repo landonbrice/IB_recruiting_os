@@ -17,18 +17,22 @@ import { useResumeWorkshop } from "@/hooks/useResumeWorkshop";
 import ResumeDocument from "./ResumeDocument";
 import BulletWorkshop from "./BulletWorkshop";
 import ScoreCard from "@/components/ScoreCard";
+import IntakeForm from "@/components/IntakeForm";
 
 interface ResumeTabProps {
   session: CoachSession;
   onHideCoach: (hide: boolean) => void;
+  verbHighlightMode?: boolean;
 }
 
-export default function ResumeTab({ session, onHideCoach }: ResumeTabProps) {
+export default function ResumeTab({ session, onHideCoach, verbHighlightMode = false }: ResumeTabProps) {
   const {
     currentResumeText,
     resumeText,
     candidateProfile,
     resumeScore,
+    showIntakeForm,
+    handleIntakeSubmit,
     handleApplyBullet,
   } = session;
 
@@ -113,6 +117,7 @@ export default function ResumeTab({ session, onHideCoach }: ResumeTabProps) {
           compressed={isWorkshopOpen}
           workshopBulletId={workshopBulletId}
           previewText={previewText}
+          verbHighlightMode={verbHighlightMode}
           onBulletClick={openWorkshop}
         />
       </div>
@@ -144,6 +149,34 @@ export default function ResumeTab({ session, onHideCoach }: ResumeTabProps) {
           />
         )}
       </div>
+
+      {/* Intake Form Modal */}
+      {showIntakeForm && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-smoke/60 backdrop-blur-sm">
+          <IntakeForm onSubmit={handleIntakeSubmit} />
+        </div>
+      )}
+
+      {/* Verb Highlight Legend */}
+      {verbHighlightMode && !isWorkshopOpen && (
+        <div
+          className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 flex items-center gap-4 rounded-[8px] bg-white px-4 py-2"
+          style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.1)", border: "1px solid #e8e4dc" }}
+        >
+          <span className="flex items-center gap-1.5 text-[10px]">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#22c55e" }} />
+            Strong
+          </span>
+          <span className="flex items-center gap-1.5 text-[10px]">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#d97706" }} />
+            Moderate
+          </span>
+          <span className="flex items-center gap-1.5 text-[10px]">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#ef4444" }} />
+            Weak
+          </span>
+        </div>
+      )}
 
       {/* Floating Score Badge */}
       {resumeScore && !isWorkshopOpen && (

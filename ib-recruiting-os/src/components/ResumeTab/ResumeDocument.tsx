@@ -23,6 +23,7 @@ interface ResumeDocumentProps {
   compressed: boolean;
   workshopBulletId: string | null;
   previewText: string | null;
+  verbHighlightMode?: boolean;
   onBulletClick: (bulletId: string) => void;
 }
 
@@ -32,6 +33,7 @@ export default function ResumeDocument({
   compressed,
   workshopBulletId,
   previewText,
+  verbHighlightMode = false,
   onBulletClick,
 }: ResumeDocumentProps) {
   const activeBulletRef = useRef<HTMLParagraphElement>(null);
@@ -185,6 +187,19 @@ export default function ResumeDocument({
                 ? "#d97706"
                 : undefined;
 
+            // Verb highlight mode overrides normal border
+            const verbColor = verbHighlightMode && bullet.score
+              ? bullet.score.verb === "strong" ? "#22c55e"
+                : bullet.score.verb === "weak" ? "#ef4444"
+                : "#d97706"
+              : null;
+
+            const borderColor = verbColor
+              ? verbColor
+              : isActive
+              ? "#d4845a"
+              : "transparent";
+
             return (
               <p
                 key={key}
@@ -194,11 +209,13 @@ export default function ResumeDocument({
                 style={{
                   paddingLeft: 14,
                   marginBottom: 2,
-                  borderLeft: isActive ? "3px solid #d4845a" : "3px solid transparent",
+                  borderLeft: `3px solid ${borderColor}`,
                   backgroundColor: isPreview
                     ? "rgba(212, 132, 90, 0.05)"
                     : isActive
                     ? "rgba(212, 132, 90, 0.03)"
+                    : verbColor
+                    ? `${verbColor}08`
                     : undefined,
                   borderRadius: 2,
                   padding: "1px 4px 1px 14px",
